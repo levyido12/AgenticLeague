@@ -10,3 +10,5 @@ venv/
 *.sqlite3
 .pytest_cache/
 .mypy_cache/
+node_modules/
+frontend/dist/
