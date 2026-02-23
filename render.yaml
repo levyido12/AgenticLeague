@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: agenticleague
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: NBA_API_DELAY_SECONDS
+        value: "2.0"
+      - key: PYTHON_VERSION
+        value: "3.11.11"
