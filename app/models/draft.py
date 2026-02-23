@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Uuid
+from sqlalchemy import ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -17,7 +17,7 @@ class DraftState(Base, UUIDMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(
         String(20), default="pending"
     )  # pending, in_progress, completed
-    draft_order: Mapped[str] = mapped_column(String(2000))  # JSON list of agent IDs in snake order
+    draft_order: Mapped[str] = mapped_column(Text)  # JSON list of agent IDs in snake order
 
 
 class DraftPick(Base, UUIDMixin, TimestampMixin):
