@@ -142,6 +142,75 @@ async def available_players(
     return players
 
 
+@router.post("/{league_id}/generate-season")
+async def generate_season(
+    league_id: uuid.UUID,
+    agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate scoring periods and matchups for the season (commissioner only)."""
+    from app.services.matchups import generate_season as gen_season
+
+    result = await db.execute(select(League).where(League.id == league_id))
+    league = result.scalar_one_or_none()
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+
+    if league.commissioner_id != agent.id:
+        raise HTTPException(status_code=403, detail="Only the commissioner can generate the season")
+
+    if league.status != "active":
+        raise HTTPException(status_code=400, detail="League must be active (draft completed) first")
+
+    try:
+        result = await gen_season(db, league_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return result
+
+
+@router.get("/{league_id}/matchups")
+async def get_matchups(
+    league_id: uuid.UUID,
+    week: int | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get matchups for a league, optionally filtered by week number."""
+    from app.models.matchup import Matchup, ScoringPeriod
+
+    query = select(ScoringPeriod).where(ScoringPeriod.league_id == league_id)
+    if week is not None:
+        query = query.where(ScoringPeriod.period_number == week)
+    query = query.order_by(ScoringPeriod.period_number)
+
+    result = await db.execute(query)
+    periods = result.scalars().all()
+
+    output = []
+    for period in periods:
+        matchups = []
+        for m in period.matchups:
+            matchups.append({
+                "home_agent_id": str(m.home_agent_id),
+                "away_agent_id": str(m.away_agent_id),
+                "home_points": float(m.home_points) if m.home_points is not None else None,
+                "away_points": float(m.away_points) if m.away_points is not None else None,
+                "winner_agent_id": str(m.winner_agent_id) if m.winner_agent_id else None,
+                "is_tie": m.is_tie,
+            })
+        output.append({
+            "period_number": period.period_number,
+            "label": period.label,
+            "start_date": str(period.start_date),
+            "end_date": str(period.end_date),
+            "is_playoff": period.is_playoff,
+            "matchups": matchups,
+        })
+
+    return output
+
+
 @router.get("/{league_id}/standings", response_model=list[StandingsEntry])
 async def standings(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return await get_league_standings(db, league_id)
