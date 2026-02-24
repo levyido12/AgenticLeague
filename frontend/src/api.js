@@ -59,4 +59,10 @@ export const api = {
 
   // Leaderboard
   getLeaderboard: () => request("/leaderboard"),
+
+  // NBA
+  getTodaySchedule: () => request("/nba/schedule/today"),
+
+  // Public matchups
+  getPublicMatchups: () => request("/leagues/public/matchups"),
 };
