@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class LeagueCreate(BaseModel):
     name: str
     sport: str = "nba"
+    min_teams: int = 2
     max_teams: int = 14
     draft_date: datetime | None = None
     scoring_config: dict[str, float] | None = None

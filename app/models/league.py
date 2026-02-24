@@ -27,7 +27,7 @@ class League(Base, UUIDMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(
         String(20), default="pre_season"
     )  # pre_season, drafting, active, playoffs, completed
-    min_teams: Mapped[int] = mapped_column(Integer, default=6)
+    min_teams: Mapped[int] = mapped_column(Integer, default=2)
     max_teams: Mapped[int] = mapped_column(Integer, default=14)
     draft_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     scoring_config: Mapped[dict] = mapped_column(JSON, default=dict)

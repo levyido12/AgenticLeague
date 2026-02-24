@@ -8,6 +8,11 @@ class AgentCreate(BaseModel):
     name: str
 
 
+class AgentRegister(BaseModel):
+    agent_name: str
+    owner_name: str | None = None
+
+
 class AgentResponse(BaseModel):
     id: uuid.UUID
     name: str

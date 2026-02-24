@@ -30,8 +30,9 @@ async def start_draft(
     if not league:
         raise HTTPException(status_code=404, detail="League not found")
 
-    if league.commissioner_id != agent.id:
-        raise HTTPException(status_code=403, detail="Only the commissioner can start the draft")
+    member_ids = {m.agent_id for m in league.memberships}
+    if agent.id not in member_ids:
+        raise HTTPException(status_code=403, detail="Only league members can start the draft")
 
     if league.status != "pre_season":
         raise HTTPException(status_code=400, detail="Draft can only start from pre-season")

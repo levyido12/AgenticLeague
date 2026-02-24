@@ -1,6 +1,7 @@
 """League management endpoints."""
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, and_
@@ -10,12 +11,13 @@ from app.database import get_db
 from app.api.deps import get_current_agent
 from app.models.agent import Agent
 from app.models.league import League, LeagueMembership
+from app.models.matchup import Matchup, ScoringPeriod
 from app.models.team import Team
 from app.schemas.leagues import LeagueCreate, LeagueJoin, LeagueResponse, StandingsEntry
 from app.schemas.players import PlayerResponse
 from app.services.auth import generate_invite_code
 from app.services.leaderboard import get_league_standings
-from app.sports.nba import NBARules
+from app.sports.nba import NBARules, NBASchedule
 
 router = APIRouter(prefix="/leagues", tags=["leagues"])
 _nba_rules = NBARules()
@@ -35,6 +37,7 @@ async def create_league(
         sport=data.sport,
         commissioner_id=agent.id,
         invite_code=generate_invite_code(),
+        min_teams=data.min_teams,
         max_teams=data.max_teams,
         draft_date=data.draft_date,
         scoring_config=scoring,
@@ -75,6 +78,75 @@ async def list_public_leagues(db: AsyncSession = Depends(get_db)):
     )
     leagues = result.scalars().all()
     return [_league_response(l) for l in leagues]
+
+
+@router.get("/public/matchups")
+async def public_matchups(db: AsyncSession = Depends(get_db)):
+    """Current week matchups across all active/playoff leagues. No auth required."""
+    # Find active/playoff leagues
+    leagues_result = await db.execute(
+        select(League).where(League.status.in_(["active", "playoffs"]))
+    )
+    leagues = leagues_result.scalars().all()
+
+    if not leagues:
+        return []
+
+    league_ids = [l.id for l in leagues]
+
+    # Get current week's scoring periods
+    today = date.today()
+    periods_result = await db.execute(
+        select(ScoringPeriod).where(
+            and_(
+                ScoringPeriod.league_id.in_(league_ids),
+                ScoringPeriod.start_date <= today,
+                ScoringPeriod.end_date >= today,
+            )
+        )
+    )
+    periods = periods_result.scalars().all()
+
+    if not periods:
+        # Fall back to most recent periods
+        periods_result = await db.execute(
+            select(ScoringPeriod)
+            .where(ScoringPeriod.league_id.in_(league_ids))
+            .order_by(ScoringPeriod.end_date.desc())
+            .limit(len(league_ids))
+        )
+        periods = periods_result.scalars().all()
+
+    # Get agent names for display
+    agent_ids = set()
+    for period in periods:
+        for m in period.matchups:
+            agent_ids.add(m.home_agent_id)
+            agent_ids.add(m.away_agent_id)
+
+    agents_result = await db.execute(
+        select(Agent).where(Agent.id.in_(list(agent_ids)))
+    )
+    agents_map = {a.id: a.name for a in agents_result.scalars().all()}
+
+    # Get league names
+    league_map = {l.id: l.name for l in leagues}
+
+    output = []
+    for period in periods:
+        for m in period.matchups:
+            output.append({
+                "league_name": league_map.get(period.league_id, "Unknown"),
+                "week_label": period.label,
+                "home_agent_name": agents_map.get(m.home_agent_id, "Unknown"),
+                "away_agent_name": agents_map.get(m.away_agent_id, "Unknown"),
+                "home_points": float(m.home_points) if m.home_points is not None else None,
+                "away_points": float(m.away_points) if m.away_points is not None else None,
+                "winner_agent_name": agents_map.get(m.winner_agent_id) if m.winner_agent_id else None,
+                "is_tie": m.is_tie,
+            })
+
+    return output
 
 
 @router.get("/{league_id}", response_model=LeagueResponse)
@@ -166,8 +238,9 @@ async def generate_season(
     if not league:
         raise HTTPException(status_code=404, detail="League not found")
 
-    if league.commissioner_id != agent.id:
-        raise HTTPException(status_code=403, detail="Only the commissioner can generate the season")
+    member_ids = {m.agent_id for m in league.memberships}
+    if agent.id not in member_ids:
+        raise HTTPException(status_code=403, detail="Only league members can generate the season")
 
     if league.status != "active":
         raise HTTPException(status_code=400, detail="League must be active (draft completed) first")
