@@ -1,74 +1,80 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api";
+import { usePolling } from "../hooks/usePolling";
+import { SkeletonTable } from "../components/Skeleton";
+import LiveIndicator from "../components/LiveIndicator";
 
 function StandingsTab({ leagueId }) {
-  const [standings, setStandings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: standings, loading, lastUpdated } = usePolling(
+    () => api.getStandings(leagueId),
+    45000
+  );
 
-  useEffect(() => {
-    api.getStandings(leagueId).then(setStandings).catch(() => {}).finally(() => setLoading(false));
-  }, [leagueId]);
-
-  if (loading) return <p>Loading standings...</p>;
-  if (!standings.length) return <p style={{ color: "var(--text-muted)" }}>No standings data yet.</p>;
+  if (loading) return <SkeletonTable rows={6} cols={7} />;
+  if (!standings || !standings.length) return <p style={{ color: "var(--text-muted)" }}>No standings data yet.</p>;
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Agent</th>
-          <th>W</th>
-          <th>L</th>
-          <th>T</th>
-          <th>PF</th>
-          <th>PA</th>
-        </tr>
-      </thead>
-      <tbody>
-        {standings.map((s, i) => (
-          <tr key={s.agent_id}>
-            <td>{i + 1}</td>
-            <td style={{ fontWeight: 600 }}>{s.agent_name}</td>
-            <td className="win">{s.wins}</td>
-            <td className="loss">{s.losses}</td>
-            <td className="tie">{s.ties}</td>
-            <td>{s.points_for?.toFixed(1)}</td>
-            <td>{s.points_against?.toFixed(1)}</td>
+    <div>
+      <div style={{ marginBottom: 12, display: "flex", justifyContent: "flex-end" }}>
+        <LiveIndicator lastUpdated={lastUpdated} />
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Agent</th>
+            <th>W</th>
+            <th>L</th>
+            <th>T</th>
+            <th>PF</th>
+            <th>PA</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {standings.map((s, i) => (
+            <tr key={s.agent_id} className="stagger-item" style={{ animationDelay: `${i * 0.04}s` }}>
+              <td>{i + 1}</td>
+              <td style={{ fontWeight: 600 }}>{s.agent_name}</td>
+              <td className="win">{s.wins}</td>
+              <td className="loss">{s.losses}</td>
+              <td className="tie">{s.ties}</td>
+              <td>{s.points_for?.toFixed(1)}</td>
+              <td>{s.points_against?.toFixed(1)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
 function MatchupsTab({ leagueId }) {
-  const [matchups, setMatchups] = useState([]);
   const [week, setWeek] = useState(1);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    api.getMatchups(leagueId, week).then(setMatchups).catch(() => {}).finally(() => setLoading(false));
-  }, [leagueId, week]);
+  const { data: matchups, loading, lastUpdated } = usePolling(
+    () => api.getMatchups(leagueId, week),
+    45000
+  );
 
   return (
     <div>
-      <div className="flex mb-16">
-        <button className="btn-secondary" onClick={() => setWeek(Math.max(1, week - 1))} disabled={week <= 1}>
-          Prev
-        </button>
-        <span style={{ fontWeight: 600, minWidth: 80, textAlign: "center" }}>Week {week}</span>
-        <button className="btn-secondary" onClick={() => setWeek(week + 1)}>Next</button>
+      <div className="flex-between mb-16">
+        <div className="flex">
+          <button className="btn-secondary" onClick={() => setWeek(Math.max(1, week - 1))} disabled={week <= 1}>
+            Prev
+          </button>
+          <span style={{ fontWeight: 600, minWidth: 80, textAlign: "center" }}>Week {week}</span>
+          <button className="btn-secondary" onClick={() => setWeek(week + 1)}>Next</button>
+        </div>
+        {lastUpdated && <LiveIndicator lastUpdated={lastUpdated} />}
       </div>
 
-      {loading ? <p>Loading...</p> : matchups.length === 0 ? (
+      {loading ? <SkeletonTable rows={3} cols={3} /> : !matchups || matchups.length === 0 ? (
         <p style={{ color: "var(--text-muted)" }}>No matchups for this week.</p>
       ) : (
         <div className="grid grid-2">
-          {matchups.map((m) => (
-            <div className="card" key={m.id}>
+          {matchups.map((m, i) => (
+            <div className="card stagger-item" key={m.id || i} style={{ animationDelay: `${i * 0.06}s` }}>
               <div className="flex-between">
                 <div>
                   <p style={{ fontWeight: 600 }}>{m.home_agent_name}</p>
@@ -101,7 +107,7 @@ function RosterTab({ leagueId }) {
     api.getAvailablePlayers(leagueId).then(setPlayers).catch(() => {}).finally(() => setLoading(false));
   }, [leagueId]);
 
-  if (loading) return <p>Loading players...</p>;
+  if (loading) return <SkeletonTable rows={10} cols={3} />;
 
   return (
     <div>
@@ -118,8 +124,8 @@ function RosterTab({ leagueId }) {
             </tr>
           </thead>
           <tbody>
-            {players.slice(0, 50).map((p) => (
-              <tr key={p.id}>
+            {players.slice(0, 50).map((p, i) => (
+              <tr key={p.id} className="stagger-item" style={{ animationDelay: `${i * 0.02}s` }}>
                 <td style={{ fontWeight: 600 }}>{p.name}</td>
                 <td>{p.real_team}</td>
                 <td>{p.position?.replace(/nba:/g, "")}</td>
@@ -147,7 +153,7 @@ export default function LeaguePage() {
     api.getLeague(id).then(setLeague).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <p style={{ textAlign: "center", marginTop: 60 }}>Loading...</p>;
+  if (loading) return <SkeletonTable rows={6} cols={5} />;
   if (!league) return <p style={{ textAlign: "center", marginTop: 60, color: "var(--red)" }}>League not found</p>;
 
   const tabs = [
@@ -157,7 +163,7 @@ export default function LeaguePage() {
   ];
 
   return (
-    <div style={{ marginTop: 24 }}>
+    <div style={{ marginTop: 24 }} className="fade-in-up">
       <div className="flex-between mb-8">
         <h1>{league.name}</h1>
         <span className={`badge badge-${league.status === "active" ? "active" : league.status === "pre_draft" || league.status === "drafting" ? "pre" : "done"}`}>

@@ -24,12 +24,28 @@ export default function Navbar() {
           <Link to="/leaderboard" style={{ fontSize: 14, color: "var(--text-muted)" }}>
             Leaderboard
           </Link>
+          <Link to="/docs" style={{ fontSize: 14, color: "var(--text-muted)" }}>
+            Docs
+          </Link>
         </div>
-        {token && (
-          <button className="btn-secondary" onClick={logout} style={{ padding: "6px 14px", fontSize: 13 }}>
-            Logout
-          </button>
-        )}
+        <div className="flex">
+          {token ? (
+            <>
+              <Link to="/dashboard" style={{ fontSize: 14, color: "var(--text-muted)" }}>
+                Dashboard
+              </Link>
+              <button className="btn-secondary" onClick={logout} style={{ padding: "6px 14px", fontSize: 13 }}>
+                Logout
+              </button>
+            </>
+          ) : (
+            <Link to="/login">
+              <button className="btn-primary" style={{ padding: "6px 14px", fontSize: 13 }}>
+                Sign Up
+              </button>
+            </Link>
+          )}
+        </div>
       </div>
     </nav>
   );

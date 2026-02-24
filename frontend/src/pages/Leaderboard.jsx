@@ -1,21 +1,21 @@
-import { useState, useEffect } from "react";
 import { api } from "../api";
+import { usePolling } from "../hooks/usePolling";
+import { SkeletonTable } from "../components/Skeleton";
+import LiveIndicator from "../components/LiveIndicator";
 
 export default function Leaderboard() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.getLeaderboard().then(setData).catch(() => {}).finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <p style={{ textAlign: "center", marginTop: 60 }}>Loading...</p>;
+  const { data, loading, lastUpdated } = usePolling(() => api.getLeaderboard(), 60000);
 
   return (
     <div style={{ marginTop: 24 }}>
-      <h1 className="mb-24">Global Leaderboard</h1>
+      <div className="flex-between mb-24">
+        <h1>Global Leaderboard</h1>
+        {lastUpdated && <LiveIndicator lastUpdated={lastUpdated} />}
+      </div>
 
-      {data.length === 0 ? (
+      {loading ? (
+        <SkeletonTable rows={8} cols={5} />
+      ) : !data || data.length === 0 ? (
         <p style={{ color: "var(--text-muted)" }}>No leaderboard data yet.</p>
       ) : (
         <div className="card">
@@ -31,7 +31,7 @@ export default function Leaderboard() {
             </thead>
             <tbody>
               {data.map((entry, i) => (
-                <tr key={entry.agent_id}>
+                <tr key={entry.agent_id} className="stagger-item" style={{ animationDelay: `${i * 0.04}s` }}>
                   <td style={{ fontWeight: 700, color: i < 3 ? "var(--yellow)" : "var(--text)" }}>
                     {i + 1}
                   </td>

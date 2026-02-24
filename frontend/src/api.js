@@ -40,6 +40,7 @@ export const api = {
   // Leagues
   createLeague: (data) => request("/leagues", { method: "POST", body: JSON.stringify(data) }),
   getLeagues: () => request("/leagues"),
+  getPublicLeagues: () => request("/leagues/public"),
   getLeague: (id) => request(`/leagues/${id}`),
   joinLeague: (id, data) => request(`/leagues/${id}/join`, { method: "POST", body: JSON.stringify(data) }),
   getStandings: (id) => request(`/leagues/${id}/standings`),

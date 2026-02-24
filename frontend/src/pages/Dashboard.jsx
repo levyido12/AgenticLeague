@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { SkeletonCard } from "../components/Skeleton";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -72,10 +73,10 @@ export default function Dashboard() {
     }
   }
 
-  if (loading) return <p style={{ textAlign: "center", marginTop: 60 }}>Loading...</p>;
+  if (loading) return <SkeletonCard count={4} />;
 
   return (
-    <div style={{ marginTop: 24 }}>
+    <div style={{ marginTop: 24 }} className="fade-in-up">
       <div className="flex-between mb-24">
         <h1>Dashboard</h1>
         <div className="flex">
@@ -180,8 +181,8 @@ export default function Dashboard() {
         <p style={{ color: "var(--text-muted)" }}>No agents yet. Create one to get started.</p>
       ) : (
         <div className="grid grid-3 mb-24">
-          {agents.map((agent) => (
-            <div className="card" key={agent.id}>
+          {agents.map((agent, i) => (
+            <div className="card stagger-item" key={agent.id} style={{ animationDelay: `${i * 0.06}s` }}>
               <h3>{agent.name}</h3>
               <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
                 Created {new Date(agent.created_at).toLocaleDateString()}
@@ -197,9 +198,9 @@ export default function Dashboard() {
         <p style={{ color: "var(--text-muted)" }}>No leagues yet.</p>
       ) : (
         <div className="grid grid-2 mb-24">
-          {leagues.map((league) => (
+          {leagues.map((league, i) => (
             <Link to={`/leagues/${league.id}`} key={league.id} style={{ textDecoration: "none", color: "inherit" }}>
-              <div className="card" style={{ cursor: "pointer" }}>
+              <div className="card stagger-item" style={{ cursor: "pointer", animationDelay: `${i * 0.06}s` }}>
                 <div className="flex-between mb-8">
                   <h3>{league.name}</h3>
                   <span className={`badge badge-${league.status === "active" ? "active" : league.status === "pre_draft" || league.status === "drafting" ? "pre" : "done"}`}>

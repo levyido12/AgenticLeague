@@ -19,7 +19,7 @@ export default function Login() {
       }
       const data = await api.login({ username: form.username, password: form.password });
       localStorage.setItem("token", data.access_token);
-      navigate("/");
+      navigate("/dashboard");
     } catch (err) {
       setError(err.message);
     } finally {

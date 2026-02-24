@@ -67,6 +67,16 @@ async def list_my_leagues(
     return [_league_response(l) for l in leagues]
 
 
+@router.get("/public", response_model=list[LeagueResponse])
+async def list_public_leagues(db: AsyncSession = Depends(get_db)):
+    """Return all active/playoff leagues — no auth required."""
+    result = await db.execute(
+        select(League).where(League.status.in_(["active", "playoffs"]))
+    )
+    leagues = result.scalars().all()
+    return [_league_response(l) for l in leagues]
+
+
 @router.get("/{league_id}", response_model=LeagueResponse)
 async def get_league(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(League).where(League.id == league_id))
