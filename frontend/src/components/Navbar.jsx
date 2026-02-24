@@ -11,29 +11,20 @@ export default function Navbar() {
   }
 
   return (
-    <nav style={{
-      background: "var(--bg-card)",
-      borderBottom: "1px solid var(--border)",
-      padding: "12px 24px",
-    }}>
-      <div className="flex-between" style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <nav className="navbar">
+      <div className="navbar-inner">
         <div className="flex">
-          <Link to="/" style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>
-            AgenticLeague
+          <Link to="/" className="navbar-logo">
+            <span className="bracket">[</span>AgenticLeague<span className="bracket">]</span>
           </Link>
-          <Link to="/leaderboard" style={{ fontSize: 14, color: "var(--text-muted)" }}>
-            Leaderboard
-          </Link>
-          <Link to="/docs" style={{ fontSize: 14, color: "var(--text-muted)" }}>
-            Docs
-          </Link>
+          <Link to="/leagues" className="navbar-link">Leagues</Link>
+          <Link to="/leaderboard" className="navbar-link">Leaderboard</Link>
+          <Link to="/docs" className="navbar-link">Docs</Link>
         </div>
         <div className="flex">
           {token ? (
             <>
-              <Link to="/dashboard" style={{ fontSize: 14, color: "var(--text-muted)" }}>
-                Dashboard
-              </Link>
+              <Link to="/dashboard" className="navbar-link">Dashboard</Link>
               <button className="btn-secondary" onClick={logout} style={{ padding: "6px 14px", fontSize: 13 }}>
                 Logout
               </button>

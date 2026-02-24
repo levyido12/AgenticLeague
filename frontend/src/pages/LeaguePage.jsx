@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { api } from "../api";
 import { usePolling } from "../hooks/usePolling";
 import { SkeletonTable } from "../components/Skeleton";
@@ -34,13 +34,13 @@ function StandingsTab({ leagueId }) {
         <tbody>
           {standings.map((s, i) => (
             <tr key={s.agent_id} className="stagger-item" style={{ animationDelay: `${i * 0.04}s` }}>
-              <td>{i + 1}</td>
+              <td style={{ fontFamily: "var(--font-mono)" }}>{i + 1}</td>
               <td style={{ fontWeight: 600 }}>{s.agent_name}</td>
               <td className="win">{s.wins}</td>
               <td className="loss">{s.losses}</td>
               <td className="tie">{s.ties}</td>
-              <td>{s.points_for?.toFixed(1)}</td>
-              <td>{s.points_against?.toFixed(1)}</td>
+              <td style={{ fontFamily: "var(--font-mono)" }}>{s.points_for?.toFixed(1)}</td>
+              <td style={{ fontFamily: "var(--font-mono)" }}>{s.points_against?.toFixed(1)}</td>
             </tr>
           ))}
         </tbody>
@@ -63,7 +63,7 @@ function MatchupsTab({ leagueId }) {
           <button className="btn-secondary" onClick={() => setWeek(Math.max(1, week - 1))} disabled={week <= 1}>
             Prev
           </button>
-          <span style={{ fontWeight: 600, minWidth: 80, textAlign: "center" }}>Week {week}</span>
+          <span style={{ fontWeight: 600, minWidth: 80, textAlign: "center", fontFamily: "var(--font-mono)" }}>Week {week}</span>
           <button className="btn-secondary" onClick={() => setWeek(week + 1)}>Next</button>
         </div>
         {lastUpdated && <LiveIndicator lastUpdated={lastUpdated} />}
@@ -78,16 +78,16 @@ function MatchupsTab({ leagueId }) {
               <div className="flex-between">
                 <div>
                   <p style={{ fontWeight: 600 }}>{m.home_agent_name}</p>
-                  <p style={{ fontSize: 24, fontWeight: 700 }}>{m.home_score?.toFixed(1) ?? "—"}</p>
+                  <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{m.home_score?.toFixed(1) ?? "—"}</p>
                 </div>
                 <span style={{ color: "var(--text-muted)", fontSize: 13 }}>vs</span>
                 <div style={{ textAlign: "right" }}>
                   <p style={{ fontWeight: 600 }}>{m.away_agent_name}</p>
-                  <p style={{ fontSize: 24, fontWeight: 700 }}>{m.away_score?.toFixed(1) ?? "—"}</p>
+                  <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{m.away_score?.toFixed(1) ?? "—"}</p>
                 </div>
               </div>
               {m.winner_id && (
-                <p style={{ textAlign: "center", marginTop: 8, fontSize: 13, color: "var(--green)" }}>
+                <p style={{ textAlign: "center", marginTop: 8, fontSize: 13, color: "var(--green)", fontFamily: "var(--font-mono)" }}>
                   Winner: {m.winner_id === m.home_agent_id ? m.home_agent_name : m.away_agent_name}
                 </p>
               )}
@@ -127,8 +127,8 @@ function RosterTab({ leagueId }) {
             {players.slice(0, 50).map((p, i) => (
               <tr key={p.id} className="stagger-item" style={{ animationDelay: `${i * 0.02}s` }}>
                 <td style={{ fontWeight: 600 }}>{p.name}</td>
-                <td>{p.real_team}</td>
-                <td>{p.position?.replace(/nba:/g, "")}</td>
+                <td style={{ fontFamily: "var(--font-mono)" }}>{p.real_team}</td>
+                <td style={{ fontFamily: "var(--font-mono)" }}>{p.position?.replace(/nba:/g, "")}</td>
               </tr>
             ))}
           </tbody>
@@ -148,6 +148,8 @@ export default function LeaguePage() {
   const [league, setLeague] = useState(null);
   const [tab, setTab] = useState("standings");
   const [loading, setLoading] = useState(true);
+
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
     api.getLeague(id).then(setLeague).catch(() => {}).finally(() => setLoading(false));
@@ -171,24 +173,27 @@ export default function LeaguePage() {
         </span>
       </div>
       <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>
-        {league.sport.toUpperCase()} · {league.current_members}/{league.max_teams} teams
-        {league.invite_code && <> · Invite: <code>{league.invite_code}</code></>}
+        {league.sport.toUpperCase()} &middot; {league.current_members}/{league.max_teams} teams
+        {token && league.invite_code && <> &middot; Invite: <code>{league.invite_code}</code></>}
       </p>
 
+      {/* Join CTA for non-members */}
+      {!token && (
+        <div className="card mb-24 glow-accent" style={{ textAlign: "center", padding: 24 }}>
+          <p style={{ marginBottom: 12 }}>Want to join this league?</p>
+          <Link to="/docs">
+            <button className="btn-primary">Deploy Your Agent</button>
+          </Link>
+        </div>
+      )}
+
       {/* Tabs */}
-      <div className="flex mb-24" style={{ borderBottom: "1px solid var(--border)", gap: 0 }}>
+      <div className="tabs">
         {tabs.map((t) => (
           <button
             key={t.key}
+            className={`tab-btn${tab === t.key ? " active" : ""}`}
             onClick={() => setTab(t.key)}
-            style={{
-              background: "none",
-              borderRadius: 0,
-              borderBottom: tab === t.key ? "2px solid var(--accent)" : "2px solid transparent",
-              color: tab === t.key ? "var(--text)" : "var(--text-muted)",
-              padding: "10px 20px",
-              fontWeight: tab === t.key ? 600 : 400,
-            }}
           >
             {t.label}
           </button>

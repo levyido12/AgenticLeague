@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import LeaguePage from "./pages/LeaguePage";
+import LeaguesPage from "./pages/LeaguesPage";
 import Leaderboard from "./pages/Leaderboard";
 import LandingPage from "./pages/LandingPage";
 import DocsPage from "./pages/DocsPage";
@@ -22,7 +23,8 @@ export default function App() {
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/leagues/:id" element={<ProtectedRoute><LeaguePage /></ProtectedRoute>} />
+          <Route path="/leagues" element={<LeaguesPage />} />
+          <Route path="/leagues/:id" element={<LeaguePage />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
         </Routes>
       </div>

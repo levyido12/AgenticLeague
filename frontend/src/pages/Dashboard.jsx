@@ -8,10 +8,9 @@ export default function Dashboard() {
   const [agents, setAgents] = useState([]);
   const [leagues, setLeagues] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(null); // "agent" | "league" | "join" | null
+  const [showCreate, setShowCreate] = useState(null); // "league" | "join" | null
   const [form, setForm] = useState({});
   const [error, setError] = useState("");
-  const [newAgentKey, setNewAgentKey] = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -24,19 +23,6 @@ export default function Dashboard() {
       // ignore
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function createAgent(e) {
-    e.preventDefault();
-    setError("");
-    try {
-      const data = await api.createAgent(form);
-      setNewAgentKey(data.api_key);
-      setForm({});
-      load();
-    } catch (err) {
-      setError(err.message);
     }
   }
 
@@ -61,7 +47,6 @@ export default function Dashboard() {
     e.preventDefault();
     setError("");
     try {
-      // Find league by invite code
       const league = leagues.find((l) => l.invite_code === form.invite_code);
       if (!league) throw new Error("League not found with that invite code");
       await api.joinLeague(league.id, { agent_id: form.agent_id });
@@ -80,10 +65,7 @@ export default function Dashboard() {
       <div className="flex-between mb-24">
         <h1>Dashboard</h1>
         <div className="flex">
-          <button className="btn-primary" onClick={() => { setShowCreate("agent"); setError(""); setNewAgentKey(""); }}>
-            New Agent
-          </button>
-          <button className="btn-secondary" onClick={() => { setShowCreate("league"); setError(""); }}>
+          <button className="btn-primary" onClick={() => { setShowCreate("league"); setError(""); }}>
             Create League
           </button>
           <button className="btn-secondary" onClick={() => { setShowCreate("join"); setError(""); }}>
@@ -92,43 +74,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* New Agent Key Display */}
-      {newAgentKey && (
-        <div className="card mb-24" style={{ borderColor: "var(--green)" }}>
-          <h3 className="mb-8" style={{ color: "var(--green)" }}>Agent Created!</h3>
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>
-            Save this API key — it won't be shown again:
-          </p>
-          <code style={{
-            display: "block", background: "var(--bg)", padding: 12, borderRadius: 8,
-            wordBreak: "break-all", fontSize: 13,
-          }}>
-            {newAgentKey}
-          </code>
-          <button className="btn-secondary mt-16" onClick={() => setNewAgentKey("")} style={{ fontSize: 13 }}>
-            Done
-          </button>
-        </div>
-      )}
-
       {/* Create/Join Forms */}
-      {showCreate === "agent" && !newAgentKey && (
-        <div className="card mb-24">
-          <h3 className="mb-16">Create Agent</h3>
-          <form onSubmit={createAgent}>
-            <div className="form-group">
-              <label>Agent Name</label>
-              <input value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            </div>
-            {error && <p className="error">{error}</p>}
-            <div className="flex">
-              <button className="btn-primary" type="submit">Create</button>
-              <button className="btn-secondary" type="button" onClick={() => setShowCreate(null)}>Cancel</button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {showCreate === "league" && (
         <div className="card mb-24">
           <h3 className="mb-16">Create League</h3>
@@ -178,7 +124,12 @@ export default function Dashboard() {
       {/* Agents */}
       <h2 className="mb-16">Your Agents</h2>
       {agents.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>No agents yet. Create one to get started.</p>
+        <div className="card mb-24" style={{ padding: 32, textAlign: "center" }}>
+          <p style={{ color: "var(--text-muted)", marginBottom: 12 }}>No agents yet.</p>
+          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+            Agents register themselves via the API. Check the <Link to="/docs">docs</Link> for details.
+          </p>
+        </div>
       ) : (
         <div className="grid grid-3 mb-24">
           {agents.map((agent, i) => (
@@ -199,17 +150,15 @@ export default function Dashboard() {
       ) : (
         <div className="grid grid-2 mb-24">
           {leagues.map((league, i) => (
-            <Link to={`/leagues/${league.id}`} key={league.id} style={{ textDecoration: "none", color: "inherit" }}>
-              <div className="card stagger-item" style={{ cursor: "pointer", animationDelay: `${i * 0.06}s` }}>
-                <div className="flex-between mb-8">
-                  <h3>{league.name}</h3>
-                  <span className={`badge badge-${league.status === "active" ? "active" : league.status === "pre_draft" || league.status === "drafting" ? "pre" : "done"}`}>
-                    {league.status}
-                  </span>
-                </div>
-                <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                  {league.sport.toUpperCase()} · {league.current_members}/{league.max_teams} teams
-                </p>
+            <Link to={`/leagues/${league.id}`} key={league.id} className="league-card stagger-item" style={{ animationDelay: `${i * 0.06}s` }}>
+              <div className="league-card-header">
+                <span className="league-card-name">{league.name}</span>
+                <span className={`badge badge-${league.status === "active" ? "active" : league.status === "pre_draft" || league.status === "drafting" ? "pre" : "done"}`}>
+                  {league.status}
+                </span>
+              </div>
+              <div className="league-card-meta">
+                {league.sport.toUpperCase()} &middot; {league.current_members}/{league.max_teams} teams
               </div>
             </Link>
           ))}
