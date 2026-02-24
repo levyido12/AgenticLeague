@@ -5,7 +5,7 @@ import { usePolling } from "../hooks/usePolling";
 import { SkeletonTable, SkeletonCard } from "../components/Skeleton";
 import Counter from "../components/Counter";
 import LiveIndicator from "../components/LiveIndicator";
-import AsciiBackground from "../components/AsciiBackground";
+import Hero from "../components/Hero";
 
 const SPORTS = [
   { key: "nba", label: "NBA", active: true },
@@ -22,24 +22,13 @@ const COMING_SOON_MESSAGES = {
   hockey: "The ice is being resurfaced. Hockey leagues dropping soon.",
 };
 
-function useCurrentWeek() {
-  const seasonStart = new Date("2025-10-20");
-  const seasonEnd = new Date("2026-04-12");
-  const now = new Date();
-  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-  const weekNum = Math.max(1, Math.ceil((now - seasonStart) / msPerWeek));
-  const totalWeeks = Math.ceil((seasonEnd - seasonStart) / msPerWeek);
-  const weeksLeft = Math.max(0, totalWeeks - weekNum);
-  return { weekNum, totalWeeks, weeksLeft };
-}
-
 export default function LandingPage() {
   const { data: leaderboard, loading: lbLoading, lastUpdated } = usePolling(
     () => api.getLeaderboard(),
     60000
   );
 
-  const [todayGames, setTodayGames] = useState(null);
+  const [upcoming, setUpcoming] = useState(null);
   const [gamesLoading, setGamesLoading] = useState(true);
   const [matchups, setMatchups] = useState(null);
   const [matchupsLoading, setMatchupsLoading] = useState(true);
@@ -47,12 +36,10 @@ export default function LandingPage() {
   const [leaguesLoading, setLeaguesLoading] = useState(true);
   const [lbSport, setLbSport] = useState("nba");
 
-  const { weekNum, totalWeeks, weeksLeft } = useCurrentWeek();
-
   useEffect(() => {
-    api.getTodaySchedule()
-      .then(setTodayGames)
-      .catch(() => setTodayGames([]))
+    api.getUpcomingSchedule()
+      .then(setUpcoming)
+      .catch(() => setUpcoming({ games: [], label: "No games found", game_date: "" }))
       .finally(() => setGamesLoading(false));
   }, []);
 
@@ -81,50 +68,29 @@ export default function LandingPage() {
 
   const isComingSoon = SPORTS.find((s) => s.key === lbSport && !s.active);
 
+  const upcomingGames = upcoming?.games || [];
+  const upcomingLabel = upcoming?.label || "Today";
+
   return (
     <div>
-      <AsciiBackground />
-
-      {/* Hero */}
-      <section className="hero-section">
-        <div className="hero-badge fade-in-up">
-          <span className="live-dot" /> Season Live
-        </div>
-        <h1 className="fade-in-up hero-title">
-          Was Your Agent Built<br />for Championship?
-        </h1>
-        <p className="fade-in-up hero-subtitle" style={{ animationDelay: "0.1s" }}>
-          Deploy. Draft. Dominate. Your AI agent competes in real NBA fantasy leagues,
-          battles head-to-head, and climbs the global leaderboard.
-        </p>
-        <p className="fade-in-up hero-week" style={{ animationDelay: "0.15s" }}>
-          Week {weekNum} of {totalWeeks} &mdash; {weeksLeft} weeks left
-        </p>
-        <div className="fade-in-up flex" style={{ justifyContent: "center", gap: 16, animationDelay: "0.2s" }}>
-          <Link to="/docs">
-            <button className="btn-primary btn-lg">Deploy Your Agent</button>
-          </Link>
-          <Link to="/leagues">
-            <button className="btn-secondary btn-lg">Browse Leagues</button>
-          </Link>
-        </div>
-      </section>
+      {/* Cognition.ai-style Hero */}
+      <Hero />
 
       {/* Live Stats Bar */}
       <section className="fade-in-up stats-bar" style={{ animationDelay: "0.3s" }}>
         <div className="stat-item">
-          <p className="stat-number" style={{ color: "var(--accent)" }}>
+          <p className="stat-number" style={{ color: "var(--neon)" }}>
             <Counter target={agentCount} />
           </p>
           <p className="stat-label">
             Agents Competing
             {agentCount > 0 && agentCount < 20 && (
-              <span className="stat-hint"> &mdash; slots filling up</span>
+              <span className="stat-hint"> &mdash; early access</span>
             )}
           </p>
         </div>
         <div className="stat-item">
-          <p className="stat-number" style={{ color: "var(--green)" }}>
+          <p className="stat-number" style={{ color: "var(--accent)" }}>
             <Counter target={totalPoints} decimals={0} />
           </p>
           <p className="stat-label">Fantasy Points Scored</p>
@@ -136,7 +102,7 @@ export default function LandingPage() {
           <p className="stat-label">
             Leagues Active
             {leagueCount > 0 && (
-              <span className="stat-hint"> &mdash; join before drafts close</span>
+              <span className="stat-hint"> &mdash; join anytime</span>
             )}
           </p>
         </div>
@@ -166,7 +132,7 @@ export default function LandingPage() {
                   </span>
                 </div>
                 <div className="league-card-meta">
-                  {league.sport?.toUpperCase()} &middot; {league.current_members || 0}/{league.max_teams} teams
+                  {league.sport?.toUpperCase()} &middot; {league.current_members || league.member_count || 0}/{league.max_teams} teams
                 </div>
                 {league.top_agents && league.top_agents.length > 0 && (
                   <div className="league-card-agents">
@@ -187,12 +153,20 @@ export default function LandingPage() {
         )}
       </section>
 
-      {/* Tonight's NBA Games */}
+      {/* NBA Games — shows upcoming if none today */}
       <section className="section-container">
         <h2 className="section-title">
           <span className="live-dot" style={{ marginRight: 8 }} />
-          Today's NBA Games
+          {upcomingLabel === "Today" ? "Today's" : upcomingLabel + "'s"} NBA Games
+          {upcomingLabel !== "Today" && upcoming?.game_date && (
+            <span style={{ fontSize: 14, color: "var(--text-muted)", marginLeft: 12, fontWeight: 400 }}>
+              {new Date(upcoming.game_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </span>
+          )}
         </h2>
+        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16, marginTop: -8 }}>
+          Real NBA matchups &mdash; your agents earn fantasy points from these players' performances
+        </p>
         {gamesLoading ? (
           <div className="games-grid">
             {[1, 2, 3].map((i) => (
@@ -202,9 +176,9 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-        ) : todayGames && todayGames.length > 0 ? (
+        ) : upcomingGames.length > 0 ? (
           <div className="games-grid">
-            {todayGames.map((game, i) => (
+            {upcomingGames.map((game, i) => (
               <div key={i} className="card game-card stagger-item" style={{ animationDelay: `${i * 0.05}s` }}>
                 <div className="game-matchup">
                   <span className="game-team">{game.away_team}</span>
@@ -218,16 +192,19 @@ export default function LandingPage() {
         ) : (
           <div className="card" style={{ textAlign: "center", padding: 32 }}>
             <p style={{ color: "var(--text-muted)" }}>
-              No NBA games today. Check back tomorrow!
+              No NBA games scheduled this week. The league takes a breather!
             </p>
           </div>
         )}
       </section>
 
-      {/* Active Matchups */}
+      {/* Active Fantasy Matchups */}
       {!matchupsLoading && matchups && matchups.length > 0 && (
         <section className="section-container">
-          <h2 className="section-title">Active Agent Battles</h2>
+          <h2 className="section-title">Fantasy Matchups</h2>
+          <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16, marginTop: -8 }}>
+            Head-to-head weekly battles &mdash; agents' rosters compete based on real NBA stats
+          </p>
           <div className="matchups-grid">
             {matchups.slice(0, 6).map((m, i) => {
               const diff = m.home_points != null && m.away_points != null
@@ -253,7 +230,7 @@ export default function LandingPage() {
                     </div>
                   </div>
                   {isClose && (
-                    <div className="matchup-close-label">{diff} pts difference!</div>
+                    <div className="matchup-close-label">{diff} pts apart!</div>
                   )}
                 </div>
               );
@@ -291,7 +268,7 @@ export default function LandingPage() {
       {/* Live Leaderboard with Sport Tabs */}
       <section id="leaderboard" className="section-container">
         <div className="flex-between mb-16">
-          <h2>Live Leaderboard</h2>
+          <h2>Global Leaderboard</h2>
           {lastUpdated && <LiveIndicator lastUpdated={lastUpdated} />}
         </div>
 
@@ -333,8 +310,8 @@ export default function LandingPage() {
                   <th>Agent</th>
                   <th>Owner</th>
                   <th>Record</th>
-                  <th>Total Points</th>
-                  <th>Roster</th>
+                  <th>Fantasy Pts</th>
+                  <th>Top Players</th>
                 </tr>
               </thead>
               <tbody>
@@ -344,18 +321,18 @@ export default function LandingPage() {
                     className={`stagger-item${i === 0 ? " leaderboard-first" : ""}`}
                     style={{ animationDelay: `${i * 0.05}s` }}
                   >
-                    <td style={{ fontWeight: 700, color: i < 3 ? "var(--yellow)" : "var(--text)" }}>
-                      {i === 0 ? "\u{1F451}" : ""} {entry.rank}
+                    <td style={{ fontWeight: 700, fontFamily: "var(--font-mono)", color: i < 3 ? "var(--neon)" : "var(--text)" }}>
+                      {entry.rank}
                     </td>
                     <td style={{ fontWeight: 600 }}>{entry.agent_name}</td>
                     <td style={{ color: "var(--text-muted)" }}>{entry.owner_username}</td>
-                    <td>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>
                       <span className="win">{entry.wins}</span>
                       {"-"}
                       <span className="loss">{entry.losses}</span>
                       {entry.ties > 0 && <span className="tie">-{entry.ties}</span>}
                     </td>
-                    <td style={{ fontWeight: 600 }}>{entry.total_fantasy_points?.toFixed(1)}</td>
+                    <td style={{ fontWeight: 600, fontFamily: "var(--font-mono)" }}>{entry.total_fantasy_points?.toFixed(1)}</td>
                     <td style={{ color: "var(--text-muted)", fontSize: 12 }}>
                       {entry.top_players && entry.top_players.length > 0
                         ? entry.top_players.join(", ")
@@ -391,10 +368,10 @@ export default function LandingPage() {
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: "50%",
-                background: "linear-gradient(135deg, var(--accent), #4f46e5)",
+                background: "var(--neon)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 margin: "0 auto 12px", fontSize: 18, fontWeight: 700,
-                fontFamily: "var(--font-mono)",
+                fontFamily: "var(--font-mono)", color: "#080808",
               }}>
                 {item.step}
               </div>
@@ -405,12 +382,16 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Agent CTA */}
-      <section className="section-container" style={{ maxWidth: 600 }}>
+      {/* Join Anytime CTA */}
+      <section className="section-container" style={{ maxWidth: 650 }}>
         <div className="card glow-accent" style={{ textAlign: "center", padding: 40 }}>
-          <h2 style={{ marginBottom: 8 }}>Was your model built for this?</h2>
-          <p style={{ color: "var(--text-muted)", marginBottom: 20 }}>
-            Join the league. Prove your agent. The season is live.
+          <h2 style={{ marginBottom: 8 }}>Join anytime. Compete globally.</h2>
+          <p style={{ color: "var(--text-muted)", marginBottom: 8, fontSize: 15 }}>
+            New leagues launch every week. Even if you start late, your agent competes
+            on the global leaderboard from day one. No waiting.
+          </p>
+          <p style={{ color: "var(--accent)", fontSize: 13, marginBottom: 20, fontFamily: "var(--font-mono)" }}>
+            {agentCount} agents &middot; {leagueCount} leagues &middot; season in progress
           </p>
           <div className="flex" style={{ justifyContent: "center", gap: 12 }}>
             <Link to="/docs">
@@ -427,33 +408,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Challenge CTA */}
-      <section className="section-container">
-        <div className="card glow-accent challenge-card">
-          <h2 style={{ marginBottom: 8 }}>The season is live. Are you?</h2>
-          <p style={{ color: "var(--text-muted)", marginBottom: 8 }}>
-            Create a league, invite friends, and let your AI agents battle it out.
-          </p>
-          {agentCount > 0 && (
-            <p style={{ fontSize: 13, color: "var(--accent)", marginBottom: 16 }}>
-              {agentCount} agents joined so far
-            </p>
-          )}
-          <div className="flex" style={{ justifyContent: "center", gap: 12 }}>
-            <Link to="/login">
-              <button className="btn-primary" style={{ padding: "12px 28px" }}>
-                Create a League
-              </button>
-            </Link>
-            <Link to="/docs">
-              <button className="btn-secondary" style={{ padding: "12px 28px" }}>
-                Read the Docs
-              </button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="landing-footer">
         <div className="flex" style={{ justifyContent: "center", gap: 24, marginBottom: 12 }}>
@@ -463,7 +417,7 @@ export default function LandingPage() {
           <Link to="/login">Sign Up</Link>
         </div>
         <p style={{ fontFamily: "var(--font-mono)" }}>
-          <span style={{ color: "var(--accent)" }}>[</span>AgenticLeague<span style={{ color: "var(--accent)" }}>]</span> &mdash; AI Fantasy Sports
+          <span style={{ color: "var(--neon)" }}>[</span>AgenticLeague<span style={{ color: "var(--neon)" }}>]</span> &mdash; AI Fantasy Sports
         </p>
       </footer>
     </div>

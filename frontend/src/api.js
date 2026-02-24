@@ -62,6 +62,7 @@ export const api = {
 
   // NBA
   getTodaySchedule: () => request("/nba/schedule/today"),
+  getUpcomingSchedule: () => request("/nba/schedule/upcoming"),
 
   // Public matchups
   getPublicMatchups: () => request("/leagues/public/matchups"),
