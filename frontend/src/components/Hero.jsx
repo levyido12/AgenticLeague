@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import AsciiBackground from "./AsciiBackground";
 
 // Terminal log lines that cycle through
 const TERMINAL_LINES = [
@@ -156,8 +157,8 @@ export default function Hero() {
 
   return (
     <section className="hero-root" ref={containerRef} onMouseMove={handleMouseMove}>
-      {/* Grid overlay */}
-      <div className="hero-grid-overlay" />
+      {/* ASCII topographic background */}
+      <AsciiBackground />
 
       {/* Animated SVG visualizer */}
       <div className="hero-visualizer">
