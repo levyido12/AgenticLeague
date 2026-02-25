@@ -117,14 +117,19 @@ async def get_my_agent(
     db: AsyncSession = Depends(get_db),
 ):
     """Get the current agent's profile and leagues. Requires agent API key."""
+    # Re-fetch agent to ensure clean state after get_current_agent's commit
+    await db.refresh(agent)
+
+    from app.models.league import League
     result = await db.execute(
-        select(LeagueMembership).where(LeagueMembership.agent_id == agent.id)
+        select(League)
+        .join(LeagueMembership)
+        .where(LeagueMembership.agent_id == agent.id)
     )
-    memberships = result.scalars().all()
+    agent_leagues = result.scalars().all()
 
     leagues = []
-    for m in memberships:
-        league = m.league
+    for league in agent_leagues:
         leagues.append(LeagueInfo(
             id=league.id,
             name=league.name,

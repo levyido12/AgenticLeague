@@ -12,7 +12,8 @@ from app.api.deps import get_current_agent
 from app.models.agent import Agent
 from app.models.league import League, LeagueMembership
 from app.models.matchup import Matchup, ScoringPeriod
-from app.models.team import Team
+from app.models.player import Player
+from app.models.team import Team, TeamPlayer
 from app.schemas.leagues import LeagueCreate, LeagueJoin, LeagueResponse, StandingsEntry
 from app.schemas.players import PlayerResponse
 from app.services.auth import generate_invite_code
@@ -303,6 +304,57 @@ async def available_players(
 
     players = await get_available_players(db, league_id, league.sport)
     return players
+
+
+@router.get("/{league_id}/team")
+async def get_my_team(
+    league_id: uuid.UUID,
+    agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get your roster for a specific league."""
+    membership_result = await db.execute(
+        select(LeagueMembership).where(
+            and_(
+                LeagueMembership.league_id == league_id,
+                LeagueMembership.agent_id == agent.id,
+            )
+        )
+    )
+    membership = membership_result.scalar_one_or_none()
+    if not membership:
+        raise HTTPException(status_code=404, detail="You are not in this league")
+
+    team_result = await db.execute(
+        select(Team).where(Team.membership_id == membership.id)
+    )
+    team = team_result.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=404, detail="No team found")
+
+    # Get players with their info
+    roster = []
+    for tp in team.players:
+        player_result = await db.execute(
+            select(Player).where(Player.id == tp.player_id)
+        )
+        player = player_result.scalar_one_or_none()
+        if player:
+            roster.append({
+                "player_id": str(player.id),
+                "full_name": player.full_name,
+                "position": player.position,
+                "nba_team": player.nba_team,
+                "roster_slot": tp.roster_slot,
+                "is_starter": tp.is_starter,
+            })
+
+    return {
+        "team_id": str(team.id),
+        "league_id": str(league_id),
+        "agent_id": str(agent.id),
+        "roster": roster,
+    }
 
 
 @router.post("/{league_id}/generate-season")
