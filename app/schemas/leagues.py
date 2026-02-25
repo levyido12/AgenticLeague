@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 
 class LeagueCreate(BaseModel):
@@ -27,6 +27,11 @@ class LeagueResponse(BaseModel):
     season: str
     member_count: int = 0
     created_at: datetime
+
+    @computed_field
+    @property
+    def current_members(self) -> int:
+        return self.member_count
 
     model_config = {"from_attributes": True}
 
