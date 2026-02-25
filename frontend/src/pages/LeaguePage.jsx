@@ -100,45 +100,52 @@ function MatchupsTab({ leagueId }) {
 }
 
 function RosterTab({ leagueId }) {
-  const [players, setPlayers] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getAvailablePlayers(leagueId).then(setPlayers).catch(() => {}).finally(() => setLoading(false));
+    api.getLeagueTeams(leagueId).then(setTeams).catch(() => {}).finally(() => setLoading(false));
   }, [leagueId]);
 
   if (loading) return <SkeletonTable rows={10} cols={3} />;
 
+  if (!teams || teams.length === 0) {
+    return <p style={{ color: "var(--text-muted)" }}>No teams yet — draft hasn't started.</p>;
+  }
+
   return (
     <div>
-      <h3 className="mb-16">Available Players</h3>
-      {players.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>No available players.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Player</th>
-              <th>Team</th>
-              <th>Position</th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.slice(0, 50).map((p, i) => (
-              <tr key={p.id} className="stagger-item" style={{ animationDelay: `${i * 0.02}s` }}>
-                <td style={{ fontWeight: 600 }}>{p.name}</td>
-                <td style={{ fontFamily: "var(--font-mono)" }}>{p.real_team}</td>
-                <td style={{ fontFamily: "var(--font-mono)" }}>{p.position?.replace(/nba:/g, "")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {players.length > 50 && (
-        <p style={{ color: "var(--text-muted)", marginTop: 12, fontSize: 13 }}>
-          Showing 50 of {players.length} available players
-        </p>
-      )}
+      <div className="grid grid-2" style={{ gap: 16 }}>
+        {teams.map((team, ti) => (
+          <div className="card stagger-item" key={team.agent_id} style={{ animationDelay: `${ti * 0.06}s` }}>
+            <h3 style={{ marginBottom: 12 }}>{team.agent_name}</h3>
+            {team.roster.length === 0 ? (
+              <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No players drafted yet</p>
+            ) : (
+              <table style={{ fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th>Slot</th>
+                    <th>Player</th>
+                    <th>Team</th>
+                    <th>Pos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {team.roster.map((p) => (
+                    <tr key={p.id} style={{ opacity: p.is_starter ? 1 : 0.5 }}>
+                      <td style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>{p.roster_slot}</td>
+                      <td style={{ fontWeight: 600 }}>{p.full_name}</td>
+                      <td style={{ fontFamily: "var(--font-mono)" }}>{p.real_team}</td>
+                      <td style={{ fontFamily: "var(--font-mono)" }}>{p.position?.replace(/nba:/g, "")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -161,7 +168,7 @@ export default function LeaguePage() {
   const tabs = [
     { key: "standings", label: "Standings" },
     { key: "matchups", label: "Matchups" },
-    { key: "players", label: "Players" },
+    { key: "players", label: "Teams" },
   ];
 
   return (

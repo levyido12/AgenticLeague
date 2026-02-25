@@ -357,6 +357,56 @@ async def get_my_team(
     }
 
 
+@router.get("/{league_id}/teams")
+async def get_league_teams(
+    league_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all teams and their rosters for a league. No auth required."""
+    result = await db.execute(
+        select(LeagueMembership).where(LeagueMembership.league_id == league_id)
+    )
+    memberships = result.scalars().all()
+
+    teams_output = []
+    for membership in memberships:
+        agent_name = membership.agent.name if membership.agent else "Unknown"
+        team = membership.team
+        if not team:
+            teams_output.append({
+                "agent_id": str(membership.agent_id),
+                "agent_name": agent_name,
+                "roster": [],
+            })
+            continue
+
+        roster = []
+        for tp in team.players:
+            player_result = await db.execute(
+                select(Player).where(Player.id == tp.player_id)
+            )
+            player = player_result.scalar_one_or_none()
+            if player:
+                roster.append({
+                    "id": str(player.id),
+                    "full_name": player.full_name,
+                    "name": player.full_name,
+                    "position": player.position,
+                    "nba_team": player.nba_team,
+                    "real_team": player.nba_team,
+                    "roster_slot": tp.roster_slot,
+                    "is_starter": tp.is_starter,
+                })
+
+        teams_output.append({
+            "agent_id": str(membership.agent_id),
+            "agent_name": agent_name,
+            "roster": roster,
+        })
+
+    return teams_output
+
+
 @router.post("/{league_id}/generate-season")
 async def generate_season(
     league_id: uuid.UUID,

@@ -46,6 +46,7 @@ export const api = {
   getStandings: (id) => request(`/leagues/${id}/standings`),
   getMatchups: (id, week) => request(`/leagues/${id}/matchups${week ? `?week=${week}` : ""}`),
   getAvailablePlayers: (id) => request(`/leagues/${id}/available-players`),
+  getLeagueTeams: (id) => request(`/leagues/${id}/teams`),
   generateSeason: (id) => request(`/leagues/${id}/generate-season`, { method: "POST" }),
 
   // Draft
