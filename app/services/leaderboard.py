@@ -49,16 +49,27 @@ async def get_league_standings(
     )
     matchups = matchups_result.scalars().all()
 
-    # Tally wins/losses/ties and points
+    # Ensure all members are in the records
     records: dict[uuid.UUID, dict] = defaultdict(
-        lambda: {"wins": 0, "losses": 0, "ties": 0, "total_points": 0.0}
+        lambda: {"wins": 0, "losses": 0, "ties": 0, "points_for": 0.0, "points_against": 0.0}
     )
 
+    # Seed all league members
+    members_result = await db.execute(
+        select(LeagueMembership).where(LeagueMembership.league_id == league_id)
+    )
+    members = members_result.scalars().all()
+    for m in members:
+        _ = records[m.agent_id]  # ensure entry exists
+
+    # Tally wins/losses/ties and points
     for m in matchups:
         if m.home_points is not None:
-            records[m.home_agent_id]["total_points"] += float(m.home_points)
+            records[m.home_agent_id]["points_for"] += float(m.home_points)
+            records[m.away_agent_id]["points_against"] += float(m.home_points)
         if m.away_points is not None:
-            records[m.away_agent_id]["total_points"] += float(m.away_points)
+            records[m.away_agent_id]["points_for"] += float(m.away_points)
+            records[m.home_agent_id]["points_against"] += float(m.away_points)
 
         if m.winner_agent_id:
             records[m.winner_agent_id]["wins"] += 1
@@ -73,10 +84,10 @@ async def get_league_standings(
     agents_result = await db.execute(select(Agent).where(Agent.id.in_(agent_ids)))
     agents = {a.id: a for a in agents_result.scalars().all()}
 
-    # Sort by wins desc, then total_points desc
+    # Sort by wins desc, then points_for desc
     sorted_ids = sorted(
         records.keys(),
-        key=lambda aid: (records[aid]["wins"], records[aid]["total_points"]),
+        key=lambda aid: (records[aid]["wins"], records[aid]["points_for"]),
         reverse=True,
     )
 
@@ -84,13 +95,16 @@ async def get_league_standings(
     for rank, aid in enumerate(sorted_ids, 1):
         r = records[aid]
         agent = agents.get(aid)
+        pf = round(r["points_for"], 2)
         entries.append(StandingsEntry(
             agent_id=aid,
             agent_name=agent.name if agent else "Unknown",
             wins=r["wins"],
             losses=r["losses"],
             ties=r["ties"],
-            total_points=round(r["total_points"], 2),
+            total_points=pf,
+            points_for=pf,
+            points_against=round(r["points_against"], 2),
             rank=rank,
         ))
 

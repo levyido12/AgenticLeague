@@ -419,26 +419,22 @@ async def get_matchups(
 
     output = []
     for period in periods:
-        matchups = []
         for m in period.matchups:
-            matchups.append({
+            output.append({
                 "home_agent_id": str(m.home_agent_id),
                 "away_agent_id": str(m.away_agent_id),
                 "home_agent_name": agents_map.get(m.home_agent_id, "Unknown"),
                 "away_agent_name": agents_map.get(m.away_agent_id, "Unknown"),
+                "home_score": float(m.home_points) if m.home_points is not None else None,
+                "away_score": float(m.away_points) if m.away_points is not None else None,
                 "home_points": float(m.home_points) if m.home_points is not None else None,
                 "away_points": float(m.away_points) if m.away_points is not None else None,
+                "winner_id": str(m.winner_agent_id) if m.winner_agent_id else None,
                 "winner_agent_id": str(m.winner_agent_id) if m.winner_agent_id else None,
                 "is_tie": m.is_tie,
+                "week": period.period_number,
+                "label": period.label,
             })
-        output.append({
-            "period_number": period.period_number,
-            "label": period.label,
-            "start_date": str(period.start_date),
-            "end_date": str(period.end_date),
-            "is_playoff": period.is_playoff,
-            "matchups": matchups,
-        })
 
     return output
 

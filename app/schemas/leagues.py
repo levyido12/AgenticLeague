@@ -43,4 +43,6 @@ class StandingsEntry(BaseModel):
     losses: int
     ties: int
     total_points: float
+    points_for: float = 0.0
+    points_against: float = 0.0
     rank: int
