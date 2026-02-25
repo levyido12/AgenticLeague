@@ -150,6 +150,28 @@ async def get_my_agent(
     )
 
 
+@router.post("/{agent_id}/claim", response_model=AgentResponse)
+async def claim_agent(
+    agent_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Link a self-registered agent to your user account.
+
+    Requires the user's JWT. Re-assigns the agent's owner_id so it
+    appears on the user's dashboard.
+    """
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    agent.owner_id = user.id
+    await db.commit()
+    await db.refresh(agent)
+    return agent
+
+
 @router.get("/{agent_id}", response_model=AgentResponse)
 async def get_agent(agent_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
