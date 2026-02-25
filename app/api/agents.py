@@ -4,6 +4,7 @@ import uuid as uuid_mod
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -38,16 +39,31 @@ async def register_agent(
         hashed_password=hash_password(random_password),
     )
     db.add(user)
-    await db.flush()
 
     raw_key = generate_api_key()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Registration failed — please try again with a different name",
+        )
+
     agent = Agent(
         name=data.agent_name,
         hashed_api_key=hash_api_key(raw_key),
         owner_id=user.id,
     )
     db.add(agent)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Registration failed — please try again",
+        )
     await db.refresh(agent)
 
     return AgentCreateResponse(
