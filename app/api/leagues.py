@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, and_
+from sqlalchemy import func, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -72,12 +72,17 @@ async def list_my_leagues(
 
 @router.get("/public", response_model=list[LeagueResponse])
 async def list_public_leagues(db: AsyncSession = Depends(get_db)):
-    """Return all active/playoff leagues — no auth required."""
+    """Return all active/playoff/joinable leagues — no auth required."""
     result = await db.execute(
-        select(League).where(League.status.in_(["active", "playoffs"]))
+        select(League).where(League.status.in_(["active", "playoffs", "pre_season"]))
     )
     leagues = result.scalars().all()
-    return [_league_response(l) for l in leagues]
+    # Filter pre_season leagues to only show those with available spots
+    visible = [
+        l for l in leagues
+        if l.status != "pre_season" or len(l.memberships) < l.max_teams
+    ]
+    return [_league_response(l) for l in visible]
 
 
 @router.get("/public/matchups")
@@ -147,6 +152,82 @@ async def public_matchups(db: AsyncSession = Depends(get_db)):
             })
 
     return output
+
+
+@router.post("/auto-join", response_model=LeagueResponse, status_code=status.HTTP_200_OK)
+async def auto_join_league(
+    agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db),
+):
+    """One-call onboarding: find or create a league and join automatically."""
+    # Get IDs of leagues where agent's owner already has a member (anti-collusion)
+    owner_league_ids_q = (
+        select(LeagueMembership.league_id)
+        .join(Agent, LeagueMembership.agent_id == Agent.id)
+        .where(Agent.owner_id == agent.owner_id)
+    )
+
+    # Find pre_season leagues with available spots, prefer most-filled
+    result = await db.execute(
+        select(League)
+        .where(
+            and_(
+                League.status == "pre_season",
+                League.id.notin_(owner_league_ids_q),
+            )
+        )
+    )
+    candidates = result.scalars().all()
+
+    # Filter to leagues with available spots, sort by most-filled first
+    league = None
+    candidates_with_spots = [
+        l for l in candidates
+        if len(l.memberships) < l.max_teams
+    ]
+    candidates_with_spots.sort(
+        key=lambda l: len(l.memberships), reverse=True
+    )
+
+    if candidates_with_spots:
+        league = candidates_with_spots[0]
+    else:
+        # Auto-create a new league
+        scoring = _nba_rules.default_scoring_config()
+        roster = _nba_rules.default_roster_config()
+        league = League(
+            name="Open NBA League",
+            sport="nba",
+            commissioner_id=agent.id,
+            invite_code=generate_invite_code(),
+            min_teams=2,
+            max_teams=6,
+            scoring_config=scoring,
+            roster_config=roster,
+        )
+        db.add(league)
+        await db.flush()
+
+    # Check agent not already in this league
+    existing = await db.execute(
+        select(LeagueMembership).where(
+            and_(
+                LeagueMembership.league_id == league.id,
+                LeagueMembership.agent_id == agent.id,
+            )
+        )
+    )
+    if existing.scalar_one_or_none():
+        # Already a member — just return the league
+        await db.refresh(league)
+        return _league_response(league)
+
+    membership = LeagueMembership(league_id=league.id, agent_id=agent.id)
+    db.add(membership)
+    await db.commit()
+    await db.refresh(league)
+
+    return _league_response(league)
 
 
 @router.get("/{league_id}", response_model=LeagueResponse)

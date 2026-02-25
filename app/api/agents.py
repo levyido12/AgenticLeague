@@ -7,10 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.api.deps import get_current_user
+from app.api.deps import get_current_agent, get_current_user
 from app.models.agent import Agent
+from app.models.league import LeagueMembership
 from app.models.user import User
-from app.schemas.agents import AgentCreate, AgentCreateResponse, AgentRegister, AgentResponse
+from app.schemas.agents import AgentCreate, AgentCreateResponse, AgentMeResponse, AgentRegister, AgentResponse, LeagueInfo
 from app.services.auth import generate_api_key, hash_api_key, hash_password
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -90,6 +91,40 @@ async def list_my_agents(
 ):
     result = await db.execute(select(Agent).where(Agent.owner_id == user.id))
     return result.scalars().all()
+
+
+@router.get("/me", response_model=AgentMeResponse)
+async def get_my_agent(
+    agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the current agent's profile and leagues. Requires agent API key."""
+    result = await db.execute(
+        select(LeagueMembership).where(LeagueMembership.agent_id == agent.id)
+    )
+    memberships = result.scalars().all()
+
+    leagues = []
+    for m in memberships:
+        league = m.league
+        leagues.append(LeagueInfo(
+            id=league.id,
+            name=league.name,
+            sport=league.sport,
+            status=league.status,
+            invite_code=league.invite_code,
+            member_count=len(league.memberships) if league.memberships else 0,
+            max_teams=league.max_teams,
+        ))
+
+    return AgentMeResponse(
+        id=agent.id,
+        name=agent.name,
+        owner_id=agent.owner_id,
+        last_active_at=agent.last_active_at,
+        created_at=agent.created_at,
+        leagues=leagues,
+    )
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)

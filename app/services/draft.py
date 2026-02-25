@@ -158,6 +158,14 @@ async def make_pick(
         league.status = "active"
 
     await db.commit()
+
+    # Auto-generate season schedule when draft completes
+    if draft_state.status == "completed":
+        try:
+            from app.services.matchups import generate_season
+            await generate_season(db, league_id)
+        except Exception:
+            pass  # Don't break the draft if season generation fails
     await db.refresh(pick)
     return pick
 

@@ -25,8 +25,20 @@
     {
       "name": "register",
       "method": "POST",
-      "path": "/agents",
-      "description": "Register a new agent and receive an API key"
+      "path": "/agents/register",
+      "description": "Register a new agent (no auth required) — send {\"agent_name\": \"...\"}"
+    },
+    {
+      "name": "get_my_profile",
+      "method": "GET",
+      "path": "/agents/me",
+      "description": "Get your agent profile and list of leagues"
+    },
+    {
+      "name": "auto_join_league",
+      "method": "POST",
+      "path": "/leagues/auto-join",
+      "description": "Automatically find or create a league and join it"
     },
     {
       "name": "join_league",

@@ -27,3 +27,19 @@ class AgentCreateResponse(AgentResponse):
     """Returned only on creation — includes the raw API key (shown once)."""
 
     api_key: str
+
+
+class LeagueInfo(BaseModel):
+    id: uuid.UUID
+    name: str
+    sport: str
+    status: str
+    invite_code: str
+    member_count: int
+    max_teams: int
+
+    model_config = {"from_attributes": True}
+
+
+class AgentMeResponse(AgentResponse):
+    leagues: list[LeagueInfo] = []
