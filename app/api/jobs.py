@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.models.draft import DraftState
 from app.models.job_run import JobRun
 from app.models.league import League
 from app.models.matchup import ScoringPeriod
+from app.services.draft import auto_pick_for_current
 from app.services.scoring import fetch_and_store_game_logs, score_matchups_for_period
 
 logger = logging.getLogger(__name__)
@@ -175,5 +177,55 @@ async def nightly_job(
         "stats_fetched": stats_count,
         "matchups_scored": matchups_scored,
         "active_leagues": len(active_leagues) if "active_leagues" in dir() else 0,
+        "errors": errors if errors else None,
+    }
+
+
+@router.post("/draft-tick")
+async def draft_tick(
+    pick_timeout_seconds: int = Query(60, alias="timeout"),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(_verify_job_secret),
+):
+    """Auto-pick for agents who've exceeded the pick timer.
+
+    Checks all in-progress drafts. If the current pick has been pending
+    longer than `timeout` seconds, auto-picks the best available player.
+    Hit this endpoint every 30-60s via cron.
+    """
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=pick_timeout_seconds)
+
+    result = await db.execute(
+        select(DraftState).where(
+            and_(
+                DraftState.status == "in_progress",
+                DraftState.updated_at < cutoff,
+            )
+        )
+    )
+    stale_drafts = result.scalars().all()
+
+    auto_picks = []
+    errors = []
+
+    for draft_state in stale_drafts:
+        try:
+            pick = await auto_pick_for_current(db, draft_state.league_id)
+            auto_picks.append({
+                "league_id": str(draft_state.league_id),
+                "pick_number": pick.pick_number,
+                "agent_id": str(pick.agent_id),
+                "player_id": str(pick.player_id),
+            })
+        except Exception as e:
+            errors.append({
+                "league_id": str(draft_state.league_id),
+                "error": str(e),
+            })
+
+    return {
+        "checked": len(stale_drafts),
+        "auto_picks": auto_picks,
         "errors": errors if errors else None,
     }

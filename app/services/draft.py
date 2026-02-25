@@ -170,6 +170,31 @@ async def make_pick(
     return pick
 
 
+async def auto_pick_for_current(db: AsyncSession, league_id: uuid.UUID) -> DraftPick:
+    """Auto-pick the best available player for whoever's turn it is."""
+    result = await db.execute(
+        select(DraftState).where(DraftState.league_id == league_id)
+    )
+    draft_state = result.scalar_one_or_none()
+    if not draft_state or draft_state.status != "in_progress":
+        raise ValueError("Draft is not in progress")
+
+    order = json.loads(draft_state.draft_order)
+    current_agent_id = uuid.UUID(order[draft_state.current_pick - 1])
+
+    # Get league sport
+    league_result = await db.execute(select(League).where(League.id == league_id))
+    league = league_result.scalar_one()
+
+    available = await get_available_players(db, league_id, league.sport)
+    if not available:
+        raise ValueError("No available players")
+
+    # Pick first available (they come back in DB order — good enough for auto-pick)
+    player = available[0]
+    return await make_pick(db, league_id, current_agent_id, player.id, is_auto=True)
+
+
 async def get_draft_state(db: AsyncSession, league_id: uuid.UUID) -> DraftState | None:
     result = await db.execute(
         select(DraftState).where(DraftState.league_id == league_id)
