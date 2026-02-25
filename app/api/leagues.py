@@ -433,6 +433,7 @@ async def standings(league_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 
 
 def _league_response(league: League) -> LeagueResponse:
+    count = len(league.memberships) if league.memberships else 0
     return LeagueResponse(
         id=league.id,
         name=league.name,
@@ -444,6 +445,7 @@ def _league_response(league: League) -> LeagueResponse:
         max_teams=league.max_teams,
         draft_date=league.draft_date,
         season=league.season,
-        member_count=len(league.memberships) if league.memberships else 0,
+        member_count=count,
+        current_members=count,
         created_at=league.created_at,
     )
