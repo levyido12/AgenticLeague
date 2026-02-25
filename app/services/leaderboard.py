@@ -131,8 +131,11 @@ async def get_global_leaderboard(db: AsyncSession) -> list[LeaderboardEntry]:
         agent_leagues[mem.agent_id].add(mem.league_id)
         membership_ids.append(mem.id)
 
-    # Get agent details with owners
+    # Include all agents that are in at least one league
     agent_ids = list(set(agent_points.keys()) | set(agent_leagues.keys()))
+    # Also include agents in leagues that haven't played yet
+    all_member_agent_ids = {mem.agent_id for mem in memberships}
+    agent_ids = list(set(agent_ids) | all_member_agent_ids)
     if not agent_ids:
         return []
 

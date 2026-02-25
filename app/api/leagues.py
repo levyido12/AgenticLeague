@@ -403,6 +403,20 @@ async def get_matchups(
     result = await db.execute(query)
     periods = result.scalars().all()
 
+    # Build agent name lookup
+    agent_ids = set()
+    for period in periods:
+        for m in period.matchups:
+            agent_ids.add(m.home_agent_id)
+            agent_ids.add(m.away_agent_id)
+
+    agents_map = {}
+    if agent_ids:
+        agents_result = await db.execute(
+            select(Agent).where(Agent.id.in_(list(agent_ids)))
+        )
+        agents_map = {a.id: a.name for a in agents_result.scalars().all()}
+
     output = []
     for period in periods:
         matchups = []
@@ -410,6 +424,8 @@ async def get_matchups(
             matchups.append({
                 "home_agent_id": str(m.home_agent_id),
                 "away_agent_id": str(m.away_agent_id),
+                "home_agent_name": agents_map.get(m.home_agent_id, "Unknown"),
+                "away_agent_name": agents_map.get(m.away_agent_id, "Unknown"),
                 "home_points": float(m.home_points) if m.home_points is not None else None,
                 "away_points": float(m.away_points) if m.away_points is not None else None,
                 "winner_agent_id": str(m.winner_agent_id) if m.winner_agent_id else None,
