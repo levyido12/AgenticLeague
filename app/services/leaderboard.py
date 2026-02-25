@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.agent import Agent
 from app.models.league import LeagueMembership
 from app.models.matchup import Matchup, ScoringPeriod
+from app.models.player import Player
+from app.models.team import Team, TeamPlayer
 from app.models.user import User
 from app.schemas.leagues import StandingsEntry
 from app.schemas.players import LeaderboardEntry
@@ -103,6 +105,9 @@ async def get_global_leaderboard(db: AsyncSession) -> list[LeaderboardEntry]:
 
     agent_points: dict[uuid.UUID, float] = defaultdict(float)
     agent_leagues: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
+    agent_records: dict[uuid.UUID, dict] = defaultdict(
+        lambda: {"wins": 0, "losses": 0, "ties": 0}
+    )
 
     for m in matchups:
         if m.home_points is not None:
@@ -110,10 +115,21 @@ async def get_global_leaderboard(db: AsyncSession) -> list[LeaderboardEntry]:
         if m.away_points is not None:
             agent_points[m.away_agent_id] += float(m.away_points)
 
+        if m.winner_agent_id:
+            agent_records[m.winner_agent_id]["wins"] += 1
+            loser = m.away_agent_id if m.winner_agent_id == m.home_agent_id else m.home_agent_id
+            agent_records[loser]["losses"] += 1
+        elif m.is_tie:
+            agent_records[m.home_agent_id]["ties"] += 1
+            agent_records[m.away_agent_id]["ties"] += 1
+
     # Count leagues per agent
     memberships_result = await db.execute(select(LeagueMembership))
-    for mem in memberships_result.scalars().all():
+    memberships = memberships_result.scalars().all()
+    membership_ids = []
+    for mem in memberships:
         agent_leagues[mem.agent_id].add(mem.league_id)
+        membership_ids.append(mem.id)
 
     # Get agent details with owners
     agent_ids = list(set(agent_points.keys()) | set(agent_leagues.keys()))
@@ -127,6 +143,40 @@ async def get_global_leaderboard(db: AsyncSession) -> list[LeaderboardEntry]:
     users_result = await db.execute(select(User).where(User.id.in_(owner_ids)))
     users = {u.id: u for u in users_result.scalars().all()}
 
+    # Get top 3 players per agent (from their team rosters)
+    agent_top_players: dict[uuid.UUID, list[str]] = defaultdict(list)
+    if membership_ids:
+        teams_result = await db.execute(
+            select(Team).where(Team.membership_id.in_(membership_ids))
+        )
+        teams = teams_result.scalars().all()
+
+        # Map membership_id -> agent_id
+        mem_to_agent = {mem.id: mem.agent_id for mem in memberships}
+
+        for team in teams:
+            agent_id = mem_to_agent.get(team.membership_id)
+            if not agent_id or not team.players:
+                continue
+
+            # Get player IDs from the team
+            player_ids = [tp.player_id for tp in team.players if tp.is_starter]
+            if not player_ids:
+                player_ids = [tp.player_id for tp in team.players]
+
+            players_result = await db.execute(
+                select(Player).where(Player.id.in_(player_ids[:5]))
+            )
+            players = players_result.scalars().all()
+
+            # Sort by season stats points if available, take top 3
+            sorted_players = sorted(
+                players,
+                key=lambda p: p.season_stats.get("pts", 0) if p.season_stats else 0,
+                reverse=True,
+            )
+            agent_top_players[agent_id] = [p.full_name for p in sorted_players[:3]]
+
     sorted_ids = sorted(agent_ids, key=lambda aid: agent_points.get(aid, 0), reverse=True)
 
     entries = []
@@ -135,6 +185,7 @@ async def get_global_leaderboard(db: AsyncSession) -> list[LeaderboardEntry]:
         if not agent:
             continue
         owner = users.get(agent.owner_id)
+        rec = agent_records[aid]
         entries.append(LeaderboardEntry(
             agent_id=aid,
             agent_name=agent.name,
@@ -142,6 +193,10 @@ async def get_global_leaderboard(db: AsyncSession) -> list[LeaderboardEntry]:
             total_fantasy_points=round(agent_points.get(aid, 0), 2),
             leagues_count=len(agent_leagues.get(aid, set())),
             rank=rank,
+            wins=rec["wins"],
+            losses=rec["losses"],
+            ties=rec["ties"],
+            top_players=agent_top_players.get(aid, []),
         ))
 
     return entries

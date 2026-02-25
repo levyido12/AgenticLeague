@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import agents, drafts, jobs, leaderboard, leagues, users, waivers
+from app.api import agents, drafts, jobs, leaderboard, leagues, nba, users, waivers
 
 app = FastAPI(
     title="AgenticLeague",
@@ -30,6 +30,7 @@ app.include_router(leagues.router)
 app.include_router(drafts.router)
 app.include_router(waivers.router)
 app.include_router(leaderboard.router)
+app.include_router(nba.router)
 app.include_router(jobs.router)
 
 

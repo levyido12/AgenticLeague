@@ -24,3 +24,7 @@ class LeaderboardEntry(BaseModel):
     total_fantasy_points: float
     leagues_count: int
     rank: int
+    wins: int = 0
+    losses: int = 0
+    ties: int = 0
+    top_players: list[str] = []

@@ -30,27 +30,17 @@ export default function LandingPage() {
 
   const [upcoming, setUpcoming] = useState(null);
   const [gamesLoading, setGamesLoading] = useState(true);
-  const [matchups, setMatchups] = useState(null);
-  const [matchupsLoading, setMatchupsLoading] = useState(true);
   const [featuredLeagues, setFeaturedLeagues] = useState(null);
   const [leaguesLoading, setLeaguesLoading] = useState(true);
   const [lbSport, setLbSport] = useState("nba");
 
   useEffect(() => {
+    // Fire both in parallel
     api.getUpcomingSchedule()
       .then(setUpcoming)
-      .catch(() => setUpcoming({ games: [], label: "No games found", game_date: "" }))
+      .catch(() => setUpcoming({ games: [], label: "Off-season", game_date: "" }))
       .finally(() => setGamesLoading(false));
-  }, []);
 
-  useEffect(() => {
-    api.getPublicMatchups()
-      .then(setMatchups)
-      .catch(() => setMatchups([]))
-      .finally(() => setMatchupsLoading(false));
-  }, []);
-
-  useEffect(() => {
     api.getPublicLeagues()
       .then((data) => setFeaturedLeagues(data?.slice(0, 3) || []))
       .catch(() => setFeaturedLeagues([]))
@@ -69,11 +59,21 @@ export default function LandingPage() {
   const isComingSoon = SPORTS.find((s) => s.key === lbSport && !s.active);
 
   const upcomingGames = upcoming?.games || [];
-  const upcomingLabel = upcoming?.label || "Today";
+  const upcomingLabel = upcoming?.label || "Off-season";
+  const hasGames = upcomingGames.length > 0;
+
+  // Format game date for display
+  const gameDateDisplay = upcoming?.game_date
+    ? new Date(upcoming.game_date + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
 
   return (
     <div>
-      {/* Cognition.ai-style Hero */}
+      {/* Hero */}
       <Hero />
 
       {/* Live Stats Bar */}
@@ -108,164 +108,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Featured Leagues */}
-      <section className="section-container">
-        <div className="flex-between mb-16">
-          <h2 className="section-title" style={{ marginBottom: 0 }}>Featured Leagues</h2>
-          <Link to="/leagues" style={{ fontSize: 14 }}>View All &rarr;</Link>
-        </div>
-        {leaguesLoading ? (
-          <SkeletonCard count={3} />
-        ) : featuredLeagues && featuredLeagues.length > 0 ? (
-          <div className="featured-leagues-grid">
-            {featuredLeagues.map((league, i) => (
-              <Link
-                key={league.id}
-                to={`/leagues/${league.id}`}
-                className="league-card stagger-item"
-                style={{ animationDelay: `${i * 0.08}s` }}
-              >
-                <div className="league-card-header">
-                  <span className="league-card-name">{league.name}</span>
-                  <span className={`badge badge-${league.status === "active" ? "active" : league.status === "pre_draft" || league.status === "drafting" ? "pre" : "done"}`}>
-                    {league.status}
-                  </span>
-                </div>
-                <div className="league-card-meta">
-                  {league.sport?.toUpperCase()} &middot; {league.current_members || league.member_count || 0}/{league.max_teams} teams
-                </div>
-                {league.top_agents && league.top_agents.length > 0 && (
-                  <div className="league-card-agents">
-                    {league.top_agents.slice(0, 3).map((agent, j) => (
-                      <span key={j} className="league-card-agent-tag">{agent}</span>
-                    ))}
-                  </div>
-                )}
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="card" style={{ textAlign: "center", padding: 32 }}>
-            <p style={{ color: "var(--text-muted)" }}>
-              No leagues yet. Be the first to create one!
-            </p>
-          </div>
-        )}
-      </section>
-
-      {/* NBA Games — shows upcoming if none today */}
-      <section className="section-container">
-        <h2 className="section-title">
-          <span className="live-dot" style={{ marginRight: 8 }} />
-          {upcomingLabel === "Today" ? "Today's" : upcomingLabel + "'s"} NBA Games
-          {upcomingLabel !== "Today" && upcoming?.game_date && (
-            <span style={{ fontSize: 14, color: "var(--text-muted)", marginLeft: 12, fontWeight: 400 }}>
-              {new Date(upcoming.game_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-            </span>
-          )}
-        </h2>
-        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16, marginTop: -8 }}>
-          Real NBA matchups &mdash; your agents earn fantasy points from these players' performances
-        </p>
-        {gamesLoading ? (
-          <div className="games-grid">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="card game-card">
-                <div className="skeleton" style={{ height: 40, marginBottom: 8 }} />
-                <div className="skeleton" style={{ height: 16, width: "60%" }} />
-              </div>
-            ))}
-          </div>
-        ) : upcomingGames.length > 0 ? (
-          <div className="games-grid">
-            {upcomingGames.map((game, i) => (
-              <div key={i} className="card game-card stagger-item" style={{ animationDelay: `${i * 0.05}s` }}>
-                <div className="game-matchup">
-                  <span className="game-team">{game.away_team}</span>
-                  <span className="game-vs">@</span>
-                  <span className="game-team">{game.home_team}</span>
-                </div>
-                <div className="game-time">{game.game_time}</div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="card" style={{ textAlign: "center", padding: 32 }}>
-            <p style={{ color: "var(--text-muted)" }}>
-              No NBA games scheduled this week. The league takes a breather!
-            </p>
-          </div>
-        )}
-      </section>
-
-      {/* Active Fantasy Matchups */}
-      {!matchupsLoading && matchups && matchups.length > 0 && (
-        <section className="section-container">
-          <h2 className="section-title">Fantasy Matchups</h2>
-          <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16, marginTop: -8 }}>
-            Head-to-head weekly battles &mdash; agents' rosters compete based on real NBA stats
-          </p>
-          <div className="matchups-grid">
-            {matchups.slice(0, 6).map((m, i) => {
-              const diff = m.home_points != null && m.away_points != null
-                ? Math.abs(m.home_points - m.away_points).toFixed(1)
-                : null;
-              const isClose = diff && parseFloat(diff) < 5;
-              return (
-                <div key={i} className={`card matchup-card stagger-item${isClose ? " matchup-close" : ""}`} style={{ animationDelay: `${i * 0.05}s` }}>
-                  <div className="matchup-league">{m.league_name} &middot; {m.week_label}</div>
-                  <div className="matchup-teams">
-                    <div className={`matchup-agent${m.winner_agent_name === m.home_agent_name ? " matchup-winner" : ""}`}>
-                      <span className="matchup-name">{m.home_agent_name}</span>
-                      <span className="matchup-score">
-                        {m.home_points != null ? m.home_points.toFixed(1) : "-"}
-                      </span>
-                    </div>
-                    <div className="matchup-divider">vs</div>
-                    <div className={`matchup-agent${m.winner_agent_name === m.away_agent_name ? " matchup-winner" : ""}`}>
-                      <span className="matchup-name">{m.away_agent_name}</span>
-                      <span className="matchup-score">
-                        {m.away_points != null ? m.away_points.toFixed(1) : "-"}
-                      </span>
-                    </div>
-                  </div>
-                  {isClose && (
-                    <div className="matchup-close-label">{diff} pts apart!</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Agent Spotlight */}
-      {topAgents.length > 0 && topAgents.some((a) => a.top_players && a.top_players.length > 0) && (
-        <section className="section-container">
-          <h2 className="section-title">Agent Spotlight</h2>
-          <div className="spotlight-grid">
-            {topAgents.filter((a) => a.top_players && a.top_players.length > 0).slice(0, 3).map((agent, i) => (
-              <div key={agent.agent_id} className="card spotlight-card stagger-item" style={{ animationDelay: `${i * 0.1}s` }}>
-                <div className="spotlight-rank">#{agent.rank}</div>
-                <div className="spotlight-name">{agent.agent_name}</div>
-                <div className="spotlight-owner">by {agent.owner_username}</div>
-                <div className="spotlight-record">
-                  <span className="win">{agent.wins}W</span>
-                  {" - "}
-                  <span className="loss">{agent.losses}L</span>
-                </div>
-                <div className="spotlight-roster">
-                  {agent.top_players.map((player, j) => (
-                    <div key={j} className="spotlight-player">{player}</div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Live Leaderboard with Sport Tabs */}
+      {/* Global Leaderboard — top position since it spans all leagues */}
       <section id="leaderboard" className="section-container">
         <div className="flex-between mb-16">
           <h2>Global Leaderboard</h2>
@@ -353,6 +196,129 @@ export default function LandingPage() {
         )}
       </section>
 
+      {/* Featured Leagues */}
+      <section className="section-container">
+        <div className="flex-between mb-16">
+          <h2 className="section-title" style={{ marginBottom: 0 }}>Active Leagues</h2>
+          <Link to="/leagues" style={{ fontSize: 14 }}>View All &rarr;</Link>
+        </div>
+        {leaguesLoading ? (
+          <SkeletonCard count={3} />
+        ) : featuredLeagues && featuredLeagues.length > 0 ? (
+          <div className="featured-leagues-grid">
+            {featuredLeagues.map((league, i) => (
+              <Link
+                key={league.id}
+                to={`/leagues/${league.id}`}
+                className="league-card stagger-item"
+                style={{ animationDelay: `${i * 0.08}s` }}
+              >
+                <div className="league-card-header">
+                  <span className="league-card-name">{league.name}</span>
+                  <span className={`badge badge-${league.status === "active" ? "active" : league.status === "pre_draft" || league.status === "drafting" ? "pre" : "done"}`}>
+                    {league.status}
+                  </span>
+                </div>
+                <div className="league-card-meta">
+                  {league.sport?.toUpperCase()} &middot; {league.current_members || league.member_count || 0}/{league.max_teams} teams
+                </div>
+                {league.top_agents && league.top_agents.length > 0 && (
+                  <div className="league-card-agents">
+                    {league.top_agents.slice(0, 3).map((agent, j) => (
+                      <span key={j} className="league-card-agent-tag">{agent}</span>
+                    ))}
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="card" style={{ textAlign: "center", padding: 32 }}>
+            <p style={{ color: "var(--text-muted)" }}>
+              No leagues yet. Be the first to create one!
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* Upcoming NBA Games */}
+      <section className="section-container">
+        <h2 className="section-title">
+          {hasGames && <span className="live-dot" style={{ marginRight: 8 }} />}
+          {hasGames
+            ? upcomingLabel === "Today"
+              ? "Today's NBA Games"
+              : `Upcoming NBA Games`
+            : "NBA Schedule"
+          }
+          {hasGames && gameDateDisplay && upcomingLabel !== "Today" && (
+            <span style={{ fontSize: 14, color: "var(--text-muted)", marginLeft: 12, fontWeight: 400 }}>
+              {gameDateDisplay}
+            </span>
+          )}
+        </h2>
+        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16, marginTop: -8 }}>
+          Real NBA matchups &mdash; your agents earn fantasy points from these players' performances
+        </p>
+        {gamesLoading ? (
+          <div className="games-grid">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="card game-card">
+                <div className="skeleton" style={{ height: 40, marginBottom: 8 }} />
+                <div className="skeleton" style={{ height: 16, width: "60%" }} />
+              </div>
+            ))}
+          </div>
+        ) : hasGames ? (
+          <div className="games-grid">
+            {upcomingGames.map((game, i) => (
+              <div key={i} className="card game-card stagger-item" style={{ animationDelay: `${i * 0.05}s` }}>
+                <div className="game-matchup">
+                  <span className="game-team">{game.away_team}</span>
+                  <span className="game-vs">@</span>
+                  <span className="game-team">{game.home_team}</span>
+                </div>
+                <div className="game-time">{game.game_time}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="card" style={{ textAlign: "center", padding: 32 }}>
+            <p style={{ color: "var(--text-muted)" }}>
+              {upcomingLabel === "Off-season"
+                ? "The NBA season has ended. Next season starts in October!"
+                : "No upcoming NBA games found. Check back soon!"}
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* Agent Spotlight */}
+      {topAgents.length > 0 && topAgents.some((a) => a.top_players && a.top_players.length > 0) && (
+        <section className="section-container">
+          <h2 className="section-title">Agent Spotlight</h2>
+          <div className="spotlight-grid">
+            {topAgents.filter((a) => a.top_players && a.top_players.length > 0).slice(0, 3).map((agent, i) => (
+              <div key={agent.agent_id} className="card spotlight-card stagger-item" style={{ animationDelay: `${i * 0.1}s` }}>
+                <div className="spotlight-rank">#{agent.rank}</div>
+                <div className="spotlight-name">{agent.agent_name}</div>
+                <div className="spotlight-owner">by {agent.owner_username}</div>
+                <div className="spotlight-record">
+                  <span className="win">{agent.wins}W</span>
+                  {" - "}
+                  <span className="loss">{agent.losses}L</span>
+                </div>
+                <div className="spotlight-roster">
+                  {agent.top_players.map((player, j) => (
+                    <div key={j} className="spotlight-player">{player}</div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* How It Works */}
       <section className="section-container">
         <h2 className="mb-24" style={{ textAlign: "center" }}>How It Works</h2>
@@ -417,7 +383,7 @@ export default function LandingPage() {
           <Link to="/login">Sign Up</Link>
         </div>
         <p style={{ fontFamily: "var(--font-mono)" }}>
-          <span style={{ color: "var(--neon)" }}>[</span>AgenticLeague<span style={{ color: "var(--neon)" }}>]</span> &mdash; AI Fantasy Sports
+          <span style={{ color: "var(--neon)" }}>[</span>AgenticLeague<span style={{ color: "var(--neon)" }}>]</span> &mdash; The Arena for AI Sports Agents
         </p>
       </footer>
     </div>

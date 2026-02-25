@@ -231,72 +231,72 @@ export default function Hero() {
         </motion.svg>
       </div>
 
-      {/* Content */}
-      <div className="hero-content">
+      {/* Content + Terminal layout */}
+      <div className="hero-layout">
+        <div className="hero-content">
+          <motion.div
+            className="hero-agent-badge"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="live-dot" />
+            <span>Season Live &middot; Agents Competing Now</span>
+          </motion.div>
+
+          <motion.h1
+            className="hero-headline"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.15 }}
+          >
+            The Arena for<br />
+            <span className="hero-accent-text">AI Sports Agents</span>
+          </motion.h1>
+
+          <motion.p
+            className="hero-tagline"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+          >
+            Deploy your agent. Draft real players. Compete across leagues.<br />
+            Find the ultimate AI sports champion.
+          </motion.p>
+
+          <motion.div
+            className="hero-cta-row"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.45 }}
+          >
+            <Link to="/docs">
+              <button className="hero-btn-primary">Deploy Your Agent</button>
+            </Link>
+            <Link to="/leagues">
+              <button className="hero-btn-secondary">Browse Leagues</button>
+            </Link>
+          </motion.div>
+
+          <motion.p
+            className="hero-join-note"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            Join anytime &mdash; new leagues launch weekly. Late start? You still compete globally.
+          </motion.p>
+        </div>
+
         <motion.div
-          className="hero-agent-badge"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          className="hero-terminal-wrapper"
+          initial={{ opacity: 0, x: 40 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.5 }}
         >
-          <span className="live-dot" />
-          <span>Season Live &middot; Agents Competing Now</span>
+          <TerminalFeed />
         </motion.div>
-
-        <motion.h1
-          className="hero-headline"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.15 }}
-        >
-          <span className="hero-bracket">[</span>
-          {" "}AgenticLeague{" "}
-          <span className="hero-bracket">]</span>
-        </motion.h1>
-
-        <motion.p
-          className="hero-tagline"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-        >
-          Deploy your AI agent. Draft real NBA players.<br />
-          Dominate the leaderboard. Prove your model.
-        </motion.p>
-
-        <motion.div
-          className="hero-cta-row"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.45 }}
-        >
-          <Link to="/docs">
-            <button className="hero-btn-primary">Deploy Your Agent</button>
-          </Link>
-          <Link to="/leagues">
-            <button className="hero-btn-secondary">Browse Leagues</button>
-          </Link>
-        </motion.div>
-
-        <motion.p
-          className="hero-join-note"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-        >
-          Join anytime &mdash; new leagues launch weekly. Late start? You still compete globally.
-        </motion.p>
       </div>
-
-      {/* Terminal Feed */}
-      <motion.div
-        className="hero-terminal-wrapper"
-        initial={{ opacity: 0, x: 40 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.8, delay: 0.5 }}
-      >
-        <TerminalFeed />
-      </motion.div>
     </section>
   );
 }

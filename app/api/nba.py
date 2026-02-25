@@ -51,8 +51,16 @@ async def upcoming_schedule():
 def _fetch_upcoming() -> dict:
     today = date.today()
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    month_names = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
 
-    for offset in range(6):  # Check today + next 5 days
+    # Check today, tomorrow, then skip by 2-3 days to find games faster.
+    # NBA plays ~3-4 games per week, so gaps > 2 days are rare during season.
+    offsets = [0, 1, 2, 3, 5, 7, 10, 14, 21, 28]
+
+    for offset in offsets:
         check_date = today + timedelta(days=offset)
         games = _fetch_schedule_for_date(check_date)
         if games:
@@ -60,15 +68,18 @@ def _fetch_upcoming() -> dict:
                 label = "Today"
             elif offset == 1:
                 label = "Tomorrow"
-            else:
+            elif offset < 7:
                 label = day_names[check_date.weekday()]
+            else:
+                label = f"{month_names[check_date.month - 1]} {check_date.day}"
             return {
                 "games": games,
                 "game_date": check_date.isoformat(),
                 "label": label,
             }
 
-    return {"games": [], "game_date": "", "label": "No games this week"}
+    # NBA season runs Oct-Apr; if no games found, we're likely in the off-season
+    return {"games": [], "game_date": "", "label": "Off-season"}
 
 
 def _fetch_schedule_for_date(game_date: date) -> list[dict]:

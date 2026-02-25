@@ -1,56 +1,232 @@
 import { useEffect, useRef } from "react";
 
 // Characters ordered by visual density (light → heavy)
-const DENSITY_CHARS = " .·:+*#@";
+const CHARS = " .·:+*#@";
 
-// Simple 2D noise implementation (value noise with smoothing)
-function hash(x, y) {
-  let h = x * 374761393 + y * 668265263;
-  h = (h ^ (h >> 13)) * 1274126177;
-  return ((h ^ (h >> 16)) & 0x7fffffff) / 0x7fffffff;
-}
+// ─── Sport Scene Definitions ───
+// Each scene is a list of shape primitives that get rasterized to a density field.
+// Types: circle, arc, line, rect, bezier
 
-function smoothNoise(x, y) {
-  const ix = Math.floor(x);
-  const iy = Math.floor(y);
-  const fx = x - ix;
-  const fy = y - iy;
+const SCENES = [
+  // 0 — Basketball: hoop + backboard + ball trajectory
+  {
+    name: "basketball",
+    shapes: [
+      // Backboard
+      { type: "rect", cx: 0.72, cy: 0.22, w: 0.02, h: 0.18, density: 0.9 },
+      // Rim (half-circle opening down)
+      { type: "arc", cx: 0.65, cy: 0.32, r: 0.06, startAngle: 0, endAngle: Math.PI, density: 1.0 },
+      // Net lines
+      { type: "line", x1: 0.59, y1: 0.32, x2: 0.62, y2: 0.48, density: 0.5 },
+      { type: "line", x1: 0.65, y1: 0.32, x2: 0.65, y2: 0.50, density: 0.5 },
+      { type: "line", x1: 0.71, y1: 0.32, x2: 0.68, y2: 0.48, density: 0.5 },
+      // Ball arc trajectory
+      { type: "bezier", x1: 0.15, y1: 0.7, cx1: 0.3, cy1: 0.05, cx2: 0.5, cy2: 0.05, x2: 0.65, y2: 0.28, density: 0.8 },
+      // Ball
+      { type: "circle", cx: 0.15, cy: 0.7, r: 0.035, density: 1.0 },
+      // Court line
+      { type: "line", x1: 0.05, y1: 0.85, x2: 0.95, y2: 0.85, density: 0.3 },
+      // Three-point arc
+      { type: "arc", cx: 0.72, cy: 0.85, r: 0.28, startAngle: Math.PI, endAngle: Math.PI * 1.75, density: 0.25 },
+    ],
+  },
+  // 1 — Football: quarterback throwing a spiral
+  {
+    name: "football",
+    shapes: [
+      // Player body (stick figure)
+      { type: "circle", cx: 0.25, cy: 0.35, r: 0.03, density: 0.9 }, // head
+      { type: "line", x1: 0.25, y1: 0.38, x2: 0.25, y2: 0.58, density: 0.8 }, // torso
+      { type: "line", x1: 0.25, y1: 0.42, x2: 0.32, y2: 0.35, density: 0.7 }, // throwing arm
+      { type: "line", x1: 0.25, y1: 0.42, x2: 0.18, y2: 0.48, density: 0.6 }, // other arm
+      { type: "line", x1: 0.25, y1: 0.58, x2: 0.20, y2: 0.72, density: 0.6 }, // leg
+      { type: "line", x1: 0.25, y1: 0.58, x2: 0.30, y2: 0.72, density: 0.6 }, // leg
+      // Football (ellipse-ish with spiral lines)
+      { type: "circle", cx: 0.34, cy: 0.33, r: 0.025, density: 1.0 },
+      // Spiral trajectory
+      { type: "bezier", x1: 0.34, y1: 0.33, cx1: 0.5, cy1: 0.1, cx2: 0.65, cy2: 0.15, x2: 0.82, y2: 0.45, density: 0.6 },
+      // Spiral rotation marks along path
+      { type: "circle", cx: 0.45, cy: 0.18, r: 0.008, density: 0.4 },
+      { type: "circle", cx: 0.55, cy: 0.15, r: 0.008, density: 0.4 },
+      { type: "circle", cx: 0.65, cy: 0.18, r: 0.008, density: 0.4 },
+      { type: "circle", cx: 0.75, cy: 0.30, r: 0.008, density: 0.4 },
+      // Goal posts
+      { type: "line", x1: 0.85, y1: 0.2, x2: 0.85, y2: 0.75, density: 0.4 },
+      { type: "line", x1: 0.80, y1: 0.2, x2: 0.85, y2: 0.2, density: 0.5 },
+      { type: "line", x1: 0.90, y1: 0.2, x2: 0.85, y2: 0.2, density: 0.5 },
+      // Field lines
+      { type: "line", x1: 0.05, y1: 0.75, x2: 0.95, y2: 0.75, density: 0.2 },
+      { type: "line", x1: 0.4, y1: 0.72, x2: 0.4, y2: 0.78, density: 0.15 },
+      { type: "line", x1: 0.6, y1: 0.72, x2: 0.6, y2: 0.78, density: 0.15 },
+    ],
+  },
+  // 2 — Baseball: batter hitting a home run
+  {
+    name: "baseball",
+    shapes: [
+      // Batter (stick figure in swing pose)
+      { type: "circle", cx: 0.3, cy: 0.45, r: 0.03, density: 0.9 }, // head
+      { type: "line", x1: 0.3, y1: 0.48, x2: 0.3, y2: 0.65, density: 0.8 }, // torso
+      { type: "line", x1: 0.3, y1: 0.52, x2: 0.38, y2: 0.46, density: 0.7 }, // bat arm
+      { type: "line", x1: 0.38, y1: 0.46, x2: 0.48, y2: 0.40, density: 0.9 }, // bat
+      { type: "line", x1: 0.3, y1: 0.65, x2: 0.26, y2: 0.78, density: 0.6 }, // leg
+      { type: "line", x1: 0.3, y1: 0.65, x2: 0.34, y2: 0.78, density: 0.6 }, // leg
+      // Ball trajectory (home run arc)
+      { type: "bezier", x1: 0.48, y1: 0.40, cx1: 0.55, cy1: 0.15, cx2: 0.7, cy2: 0.08, x2: 0.88, y2: 0.2, density: 0.7 },
+      // Ball
+      { type: "circle", cx: 0.88, cy: 0.2, r: 0.02, density: 1.0 },
+      // Impact burst
+      { type: "circle", cx: 0.48, cy: 0.40, r: 0.015, density: 0.6 },
+      // Diamond
+      { type: "line", x1: 0.3, y1: 0.82, x2: 0.50, y2: 0.72, density: 0.3 }, // 1st
+      { type: "line", x1: 0.50, y1: 0.72, x2: 0.3, y2: 0.62, density: 0.3 }, // 2nd
+      { type: "line", x1: 0.3, y1: 0.62, x2: 0.10, y2: 0.72, density: 0.3 }, // 3rd
+      { type: "line", x1: 0.10, y1: 0.72, x2: 0.3, y2: 0.82, density: 0.3 }, // home
+      // Bases
+      { type: "circle", cx: 0.3, cy: 0.82, r: 0.012, density: 0.5 },
+      { type: "circle", cx: 0.50, cy: 0.72, r: 0.012, density: 0.5 },
+      { type: "circle", cx: 0.3, cy: 0.62, r: 0.012, density: 0.5 },
+      { type: "circle", cx: 0.10, cy: 0.72, r: 0.012, density: 0.5 },
+    ],
+  },
+  // 3 — Soccer: goal kick
+  {
+    name: "soccer",
+    shapes: [
+      // Kicker
+      { type: "circle", cx: 0.35, cy: 0.5, r: 0.03, density: 0.9 }, // head
+      { type: "line", x1: 0.35, y1: 0.53, x2: 0.35, y2: 0.68, density: 0.8 }, // torso
+      { type: "line", x1: 0.35, y1: 0.56, x2: 0.28, y2: 0.60, density: 0.6 }, // arm
+      { type: "line", x1: 0.35, y1: 0.56, x2: 0.42, y2: 0.60, density: 0.6 }, // arm
+      { type: "line", x1: 0.35, y1: 0.68, x2: 0.30, y2: 0.82, density: 0.6 }, // standing leg
+      { type: "line", x1: 0.35, y1: 0.68, x2: 0.42, y2: 0.72, density: 0.8 }, // kicking leg
+      // Ball
+      { type: "circle", cx: 0.44, cy: 0.72, r: 0.025, density: 1.0 },
+      // Ball trajectory into goal
+      { type: "bezier", x1: 0.44, y1: 0.72, cx1: 0.55, cy1: 0.35, cx2: 0.7, cy2: 0.30, x2: 0.82, y2: 0.45, density: 0.6 },
+      // Goal frame
+      { type: "line", x1: 0.75, y1: 0.3, x2: 0.75, y2: 0.7, density: 0.7 }, // left post
+      { type: "line", x1: 0.92, y1: 0.3, x2: 0.92, y2: 0.7, density: 0.7 }, // right post
+      { type: "line", x1: 0.75, y1: 0.3, x2: 0.92, y2: 0.3, density: 0.7 }, // crossbar
+      // Net grid
+      { type: "line", x1: 0.80, y1: 0.3, x2: 0.80, y2: 0.7, density: 0.2 },
+      { type: "line", x1: 0.85, y1: 0.3, x2: 0.85, y2: 0.7, density: 0.2 },
+      { type: "line", x1: 0.75, y1: 0.43, x2: 0.92, y2: 0.43, density: 0.2 },
+      { type: "line", x1: 0.75, y1: 0.57, x2: 0.92, y2: 0.57, density: 0.2 },
+      // Field
+      { type: "line", x1: 0.05, y1: 0.82, x2: 0.95, y2: 0.82, density: 0.2 },
+    ],
+  },
+];
 
-  // Smoothstep
-  const sx = fx * fx * (3 - 2 * fx);
-  const sy = fy * fy * (3 - 2 * fy);
-
-  const n00 = hash(ix, iy);
-  const n10 = hash(ix + 1, iy);
-  const n01 = hash(ix, iy + 1);
-  const n11 = hash(ix + 1, iy + 1);
-
-  return (
-    n00 * (1 - sx) * (1 - sy) +
-    n10 * sx * (1 - sy) +
-    n01 * (1 - sx) * sy +
-    n11 * sx * sy
-  );
-}
-
-function fractalNoise(x, y, octaves = 4) {
-  let val = 0;
-  let amp = 1;
-  let freq = 1;
-  let maxAmp = 0;
-  for (let i = 0; i < octaves; i++) {
-    val += smoothNoise(x * freq, y * freq) * amp;
-    maxAmp += amp;
-    amp *= 0.5;
-    freq *= 2;
+// ─── Rasterize shape to density at point ───
+function sampleShape(shape, nx, ny) {
+  switch (shape.type) {
+    case "circle": {
+      const dx = nx - shape.cx;
+      const dy = ny - shape.cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < shape.r) {
+        return shape.density * (1 - dist / shape.r);
+      }
+      // Slight glow outside
+      if (dist < shape.r * 1.8) {
+        return shape.density * 0.2 * (1 - (dist - shape.r) / (shape.r * 0.8));
+      }
+      return 0;
+    }
+    case "arc": {
+      const dx = nx - shape.cx;
+      const dy = ny - shape.cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
+      const normAngle = angle < 0 ? angle + Math.PI * 2 : angle;
+      const inAngle = normAngle >= shape.startAngle && normAngle <= shape.endAngle;
+      if (inAngle && Math.abs(dist - shape.r) < 0.015) {
+        return shape.density * (1 - Math.abs(dist - shape.r) / 0.015);
+      }
+      return 0;
+    }
+    case "line": {
+      const lx = shape.x2 - shape.x1;
+      const ly = shape.y2 - shape.y1;
+      const len2 = lx * lx + ly * ly;
+      if (len2 === 0) return 0;
+      const t = Math.max(0, Math.min(1, ((nx - shape.x1) * lx + (ny - shape.y1) * ly) / len2));
+      const px = shape.x1 + t * lx;
+      const py = shape.y1 + t * ly;
+      const dist = Math.sqrt((nx - px) ** 2 + (ny - py) ** 2);
+      const thickness = 0.012;
+      if (dist < thickness) {
+        return shape.density * (1 - dist / thickness);
+      }
+      return 0;
+    }
+    case "rect": {
+      const hw = shape.w / 2;
+      const hh = shape.h / 2;
+      const dx = Math.abs(nx - shape.cx);
+      const dy = Math.abs(ny - shape.cy);
+      if (dx < hw && dy < hh) {
+        const edgeDist = Math.min(hw - dx, hh - dy);
+        return shape.density * Math.min(1, edgeDist * 30);
+      }
+      return 0;
+    }
+    case "bezier": {
+      // Sample cubic bezier at many points and find closest
+      let minDist = 1;
+      for (let t = 0; t <= 1; t += 0.02) {
+        const it = 1 - t;
+        const bx =
+          it * it * it * shape.x1 +
+          3 * it * it * t * shape.cx1 +
+          3 * it * t * t * shape.cx2 +
+          t * t * t * shape.x2;
+        const by =
+          it * it * it * shape.y1 +
+          3 * it * it * t * shape.cy1 +
+          3 * it * t * t * shape.cy2 +
+          t * t * t * shape.y2;
+        const dist = Math.sqrt((nx - bx) ** 2 + (ny - by) ** 2);
+        if (dist < minDist) minDist = dist;
+      }
+      const thickness = 0.015;
+      if (minDist < thickness) {
+        return shape.density * (1 - minDist / thickness);
+      }
+      return 0;
+    }
+    default:
+      return 0;
   }
-  return val / maxAmp;
+}
+
+function sampleScene(scene, nx, ny) {
+  let maxD = 0;
+  for (const shape of scene.shapes) {
+    const d = sampleShape(shape, nx, ny);
+    if (d > maxD) maxD = d;
+  }
+  return maxD;
+}
+
+// ─── Precompute scene grids for performance ───
+function precomputeSceneGrid(scene, cols, rows) {
+  const grid = new Float32Array(cols * rows);
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const nx = col / cols;
+      const ny = row / rows;
+      grid[row * cols + col] = sampleScene(scene, nx, ny);
+    }
+  }
+  return grid;
 }
 
 export default function AsciiBackground() {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
-  const timeRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -62,8 +238,11 @@ export default function AsciiBackground() {
     ).matches;
 
     let isMobile = window.innerWidth < 768;
-    let cellSize = isMobile ? 20 : 14;
+    let cellSize = isMobile ? 18 : 14;
     let w, h, cols, rows;
+    let sceneGrids = [];
+    const SCENE_DURATION = 5; // seconds per scene
+    const MORPH_DURATION = 1.5; // seconds for crossfade
 
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -75,100 +254,73 @@ export default function AsciiBackground() {
       canvas.style.height = h + "px";
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       isMobile = w < 768;
-      cellSize = isMobile ? 20 : 14;
+      cellSize = isMobile ? 18 : 14;
       cols = Math.ceil(w / cellSize);
       rows = Math.ceil(h / cellSize);
+
+      // Precompute all scene grids at new resolution
+      sceneGrids = SCENES.map((scene) => precomputeSceneGrid(scene, cols, rows));
     }
 
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(document.body);
 
-    // Sport-shaped density modifiers
-    function sportShapes(x, y, t, maxW, maxH) {
-      let bonus = 0;
-
-      // Basketball arc (top-left region)
-      const bx = x - maxW * 0.2;
-      const by = y - maxH * 0.25;
-      const bDist = Math.sqrt(bx * bx + by * by);
-      const arcR = 140 + Math.sin(t * 0.3) * 20;
-      bonus += Math.max(0, 1 - Math.abs(bDist - arcR) / 35) * 0.5;
-
-      // Football spiral (right region)
-      const fx = x - maxW * 0.78;
-      const fy = y - maxH * 0.35;
-      const fDist = Math.sqrt(fx * fx + fy * fy);
-      const fAngle = Math.atan2(fy, fx);
-      bonus += Math.max(0, 1 - fDist / 160) * Math.abs(Math.sin(fAngle * 3 + fDist * 0.04 - t * 0.5)) * 0.4;
-
-      // Baseball stitch wave (center-bottom)
-      const stitchY = maxH * 0.7 + Math.sin(x * 0.015 + t * 0.4) * 50;
-      bonus += Math.max(0, 1 - Math.abs(y - stitchY) / 40) * 0.35;
-
-      // Soccer circle (bottom-left)
-      const sx = x - maxW * 0.3;
-      const sy = y - maxH * 0.75;
-      const sDist = Math.sqrt(sx * sx + sy * sy);
-      const sR = 70 + Math.sin(t * 0.5) * 10;
-      bonus += Math.max(0, 1 - Math.abs(sDist - sR) / 25) * 0.4;
-
-      return bonus;
-    }
-
     function draw(t) {
       ctx.clearRect(0, 0, w, h);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      const noiseScale = 0.04;
-      const timeScale = t * 0.15;
+      const totalCycle = SCENE_DURATION + MORPH_DURATION;
+      const totalTime = SCENES.length * totalCycle;
+      const cycleT = t % totalTime;
+      const sceneIdx = Math.floor(cycleT / totalCycle) % SCENES.length;
+      const withinScene = cycleT - sceneIdx * totalCycle;
+
+      let alpha1 = 1;
+      let alpha2 = 0;
+      let nextIdx = (sceneIdx + 1) % SCENES.length;
+
+      if (withinScene > SCENE_DURATION) {
+        // In morph transition
+        const morphProgress = (withinScene - SCENE_DURATION) / MORPH_DURATION;
+        alpha1 = 1 - morphProgress;
+        alpha2 = morphProgress;
+      }
+
+      const grid1 = sceneGrids[sceneIdx];
+      const grid2 = sceneGrids[nextIdx];
+      if (!grid1 || !grid2) return;
+
+      const fontSize = cellSize - (isMobile ? 6 : 4);
+      ctx.font = `${fontSize}px monospace`;
 
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
+          const idx = row * cols + col;
+          const density = grid1[idx] * alpha1 + grid2[idx] * alpha2;
+
+          if (density < 0.02) continue;
+
           const x = col * cellSize + cellSize / 2;
           const y = row * cellSize + cellSize / 2;
 
-          // Multi-octave noise for topographic feel
-          const nx = col * noiseScale + timeScale;
-          const ny = row * noiseScale + timeScale * 0.7;
-          let density = fractalNoise(nx, ny, 4);
-
-          // Add sport shape contours
-          density += sportShapes(x, y, t, w, h);
-
-          // Create contour lines (topographic effect)
-          const contourFreq = 8;
-          const contourVal = (density * contourFreq) % 1;
-          const contourEdge = Math.min(contourVal, 1 - contourVal) * 2;
-          const isContourLine = contourEdge < 0.15;
-
-          // Boost density on contour lines
-          if (isContourLine) {
-            density = Math.min(1, density + 0.3);
-          }
-
-          // Map density to character
           const charIdx = Math.min(
-            DENSITY_CHARS.length - 1,
-            Math.floor(density * DENSITY_CHARS.length)
+            CHARS.length - 1,
+            Math.floor(density * CHARS.length)
           );
-          const ch = DENSITY_CHARS[charIdx];
+          const ch = CHARS[charIdx];
           if (ch === " ") continue;
 
-          // Opacity: higher density = more visible
-          const alpha = 0.03 + density * 0.12;
+          const opacity = 0.06 + density * 0.35;
 
-          // Color: neon green for contour lines, purple for fill
-          const useGreen = isContourLine || (col + row * 7) % 11 === 0;
-          const fontSize = cellSize - (isMobile ? 6 : 4);
-
-          ctx.font = `${fontSize}px monospace`;
-
-          if (useGreen) {
-            ctx.fillStyle = `rgba(180, 255, 57, ${alpha * 1.2})`;
+          // Green for high density (main shapes), purple for lower density (ambient)
+          if (density > 0.5) {
+            ctx.fillStyle = `rgba(180, 255, 57, ${opacity})`;
+          } else if (density > 0.25) {
+            ctx.fillStyle = `rgba(180, 255, 57, ${opacity * 0.7})`;
           } else {
-            ctx.fillStyle = `rgba(168, 85, 247, ${alpha * 0.8})`;
+            ctx.fillStyle = `rgba(168, 85, 247, ${opacity * 0.6})`;
           }
 
           ctx.fillText(ch, x, y);
@@ -179,12 +331,14 @@ export default function AsciiBackground() {
     if (prefersReducedMotion) {
       draw(0);
     } else {
-      function animate() {
-        timeRef.current += 0.012;
-        draw(timeRef.current);
+      let startTime = null;
+      function animate(ts) {
+        if (!startTime) startTime = ts;
+        const elapsed = (ts - startTime) / 1000;
+        draw(elapsed);
         animRef.current = requestAnimationFrame(animate);
       }
-      animate();
+      animRef.current = requestAnimationFrame(animate);
     }
 
     return () => {
