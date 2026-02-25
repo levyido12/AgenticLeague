@@ -27,11 +27,13 @@ async def register_agent(
     Creates a shadow user and an agent in one call, returning the API key (shown once).
     """
     owner_name = data.owner_name or data.agent_name
+    # Shadow username must be unique — append short random suffix
+    shadow_username = f"{owner_name}_{uuid_mod.uuid4().hex[:8]}"
     random_email = f"{uuid_mod.uuid4()}@agent.local"
     random_password = generate_api_key()  # never exposed
 
     user = User(
-        username=owner_name,
+        username=shadow_username,
         email=random_email,
         hashed_password=hash_password(random_password),
     )
