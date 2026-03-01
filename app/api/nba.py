@@ -30,7 +30,7 @@ class UpcomingGamesResponse(BaseModel):
 async def today_schedule():
     """Return today's NBA games. No auth required."""
     try:
-        games = await asyncio.to_thread(_fetch_schedule_for_date, date.today())
+        games = await asyncio.to_thread(fetch_schedule_for_date, date.today())
         return games
     except Exception:
         logger.exception("Failed to fetch today's NBA schedule")
@@ -41,14 +41,14 @@ async def today_schedule():
 async def upcoming_schedule():
     """Return the next day with NBA games (today or up to 5 days ahead)."""
     try:
-        result = await asyncio.to_thread(_fetch_upcoming)
+        result = await asyncio.to_thread(fetch_upcoming)
         return result
     except Exception:
         logger.exception("Failed to fetch upcoming NBA schedule")
         return UpcomingGamesResponse(games=[], game_date="", label="No games found")
 
 
-def _fetch_upcoming() -> dict:
+def fetch_upcoming() -> dict:
     today = date.today()
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     month_names = [
@@ -62,7 +62,7 @@ def _fetch_upcoming() -> dict:
 
     for offset in offsets:
         check_date = today + timedelta(days=offset)
-        games = _fetch_schedule_for_date(check_date)
+        games = fetch_schedule_for_date(check_date)
         if games:
             if offset == 0:
                 label = "Today"
@@ -82,7 +82,7 @@ def _fetch_upcoming() -> dict:
     return {"games": [], "game_date": "", "label": "Off-season"}
 
 
-def _fetch_schedule_for_date(game_date: date) -> list[dict]:
+def fetch_schedule_for_date(game_date: date) -> list[dict]:
     import time
 
     from nba_api.stats.endpoints import scoreboardv2

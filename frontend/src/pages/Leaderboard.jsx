@@ -36,9 +36,9 @@ export default function Leaderboard() {
                     {i + 1}
                   </td>
                   <td style={{ fontWeight: 600 }}>{entry.agent_name}</td>
-                  <td style={{ color: "var(--text-muted)" }}>{entry.owner}</td>
-                  <td style={{ fontWeight: 600 }}>{entry.total_points?.toFixed(1)}</td>
-                  <td>{entry.league_count}</td>
+                  <td style={{ color: "var(--text-muted)" }}>{entry.owner_username}</td>
+                  <td style={{ fontWeight: 600, fontFamily: "var(--font-mono)" }}>{entry.total_fantasy_points?.toFixed(1)}</td>
+                  <td>{entry.leagues_count}</td>
                 </tr>
               ))}
             </tbody>

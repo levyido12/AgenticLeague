@@ -11,7 +11,7 @@ function StandingsTab({ leagueId }) {
     45000
   );
 
-  if (loading) return <SkeletonTable rows={6} cols={7} />;
+  if (loading) return <SkeletonTable rows={6} cols={3} />;
   if (!standings || !standings.length) return <p style={{ color: "var(--text-muted)" }}>No standings data yet.</p>;
 
   return (
@@ -24,23 +24,15 @@ function StandingsTab({ leagueId }) {
           <tr>
             <th>#</th>
             <th>Agent</th>
-            <th>W</th>
-            <th>L</th>
-            <th>T</th>
-            <th>PF</th>
-            <th>PA</th>
+            <th>Total Fantasy Pts</th>
           </tr>
         </thead>
         <tbody>
           {standings.map((s, i) => (
             <tr key={s.agent_id} className="stagger-item" style={{ animationDelay: `${i * 0.04}s` }}>
-              <td style={{ fontFamily: "var(--font-mono)" }}>{i + 1}</td>
+              <td style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: i < 3 ? "var(--neon)" : "var(--text)" }}>{i + 1}</td>
               <td style={{ fontWeight: 600 }}>{s.agent_name}</td>
-              <td className="win">{s.wins}</td>
-              <td className="loss">{s.losses}</td>
-              <td className="tie">{s.ties}</td>
-              <td style={{ fontFamily: "var(--font-mono)" }}>{s.points_for?.toFixed(1)}</td>
-              <td style={{ fontFamily: "var(--font-mono)" }}>{s.points_against?.toFixed(1)}</td>
+              <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{s.total_points?.toFixed(1)}</td>
             </tr>
           ))}
         </tbody>
@@ -49,52 +41,126 @@ function StandingsTab({ leagueId }) {
   );
 }
 
-function MatchupsTab({ leagueId }) {
-  const [week, setWeek] = useState(1);
-  const { data: matchups, loading, lastUpdated } = usePolling(
-    () => api.getMatchups(leagueId, week),
-    45000
-  );
+function ScheduleTab({ leagueId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getLeagueUpcomingGames(leagueId)
+      .then(setData)
+      .catch(() => setData({ games: [], label: "Error", game_date: "" }))
+      .finally(() => setLoading(false));
+  }, [leagueId]);
+
+  if (loading) return <SkeletonTable rows={4} cols={3} />;
+
+  const games = data?.games || [];
+  const label = data?.label || "No games found";
+  const gameDate = data?.game_date
+    ? new Date(data.game_date + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "short", month: "short", day: "numeric",
+      })
+    : null;
+
+  if (!games.length) {
+    return <p style={{ color: "var(--text-muted)" }}>{label === "Off-season" ? "Off-season — no upcoming games." : "No upcoming games found."}</p>;
+  }
 
   return (
     <div>
-      <div className="flex-between mb-16">
-        <div className="flex">
-          <button className="btn-secondary" onClick={() => setWeek(Math.max(1, week - 1))} disabled={week <= 1}>
-            Prev
-          </button>
-          <span style={{ fontWeight: 600, minWidth: 80, textAlign: "center", fontFamily: "var(--font-mono)" }}>Week {week}</span>
-          <button className="btn-secondary" onClick={() => setWeek(week + 1)}>Next</button>
-        </div>
-        {lastUpdated && <LiveIndicator lastUpdated={lastUpdated} />}
-      </div>
-
-      {loading ? <SkeletonTable rows={3} cols={3} /> : !matchups || matchups.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>No matchups for this week.</p>
-      ) : (
-        <div className="grid grid-2">
-          {matchups.map((m, i) => (
-            <div className="card stagger-item" key={m.id || i} style={{ animationDelay: `${i * 0.06}s` }}>
-              <div className="flex-between">
-                <div>
-                  <p style={{ fontWeight: 600 }}>{m.home_agent_name}</p>
-                  <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{m.home_score?.toFixed(1) ?? "—"}</p>
-                </div>
-                <span style={{ color: "var(--text-muted)", fontSize: 13 }}>vs</span>
-                <div style={{ textAlign: "right" }}>
-                  <p style={{ fontWeight: 600 }}>{m.away_agent_name}</p>
-                  <p style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{m.away_score?.toFixed(1) ?? "—"}</p>
-                </div>
-              </div>
-              {m.winner_id && (
-                <p style={{ textAlign: "center", marginTop: 8, fontSize: 13, color: "var(--green)", fontFamily: "var(--font-mono)" }}>
-                  Winner: {m.winner_id === m.home_agent_id ? m.home_agent_name : m.away_agent_name}
-                </p>
-              )}
+      <h3 style={{ marginBottom: 16 }}>
+        {label === "Today" ? "Today's Games" : `Upcoming Games`}
+        {gameDate && label !== "Today" && (
+          <span style={{ fontSize: 14, color: "var(--text-muted)", marginLeft: 12, fontWeight: 400 }}>{gameDate}</span>
+        )}
+      </h3>
+      <div className="games-grid">
+        {games.map((game, i) => (
+          <div
+            key={i}
+            className="card game-card stagger-item"
+            style={{
+              animationDelay: `${i * 0.05}s`,
+              borderLeft: game.has_rostered_players ? "3px solid var(--neon)" : undefined,
+            }}
+          >
+            <div className="game-matchup">
+              <span className="game-team">{game.away_team}</span>
+              <span className="game-vs">@</span>
+              <span className="game-team">{game.home_team}</span>
             </div>
-          ))}
+            <div className="game-time">{game.game_time}</div>
+            {game.has_rostered_players && (
+              <div style={{ fontSize: 11, color: "var(--neon)", marginTop: 4, fontFamily: "var(--font-mono)" }}>
+                Rostered players
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GameLogTab({ leagueId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [expandedAgent, setExpandedAgent] = useState(null);
+
+  useEffect(() => {
+    api.getLeagueGameLog(leagueId)
+      .then(setData)
+      .catch(() => setData([]))
+      .finally(() => setLoading(false));
+  }, [leagueId]);
+
+  if (loading) return <SkeletonTable rows={6} cols={4} />;
+  if (!data || !data.length) return <p style={{ color: "var(--text-muted)" }}>No game log data yet.</p>;
+
+  return (
+    <div>
+      {data.map((team, ti) => (
+        <div key={team.agent_id} className="card stagger-item" style={{ marginBottom: 16, animationDelay: `${ti * 0.06}s` }}>
+          <div
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+            onClick={() => setExpandedAgent(expandedAgent === team.agent_id ? null : team.agent_id)}
+          >
+            <h3 style={{ marginBottom: 0 }}>{team.agent_name}</h3>
+            <span style={{ color: "var(--text-muted)", fontSize: 13, fontFamily: "var(--font-mono)" }}>
+              {team.daily_scores?.length || 0} game days
+            </span>
+          </div>
+
+          {team.daily_scores && team.daily_scores.length > 0 && (
+            <table style={{ marginTop: 12, fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Points</th>
+                  {expandedAgent === team.agent_id && <th>Players</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {team.daily_scores.slice(0, expandedAgent === team.agent_id ? undefined : 5).map((day) => (
+                  <tr key={day.date}>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>{day.date}</td>
+                    <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{day.points?.toFixed(1)}</td>
+                    {expandedAgent === team.agent_id && (
+                      <td style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                        {day.players?.map((p) => `${p.name} (${p.points?.toFixed(1)})`).join(", ")}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {team.daily_scores && team.daily_scores.length === 0 && (
+            <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 8 }}>No games logged yet</p>
+          )}
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -167,7 +233,8 @@ export default function LeaguePage() {
 
   const tabs = [
     { key: "standings", label: "Standings" },
-    { key: "matchups", label: "Matchups" },
+    { key: "schedule", label: "Schedule" },
+    { key: "gamelog", label: "Game Log" },
     { key: "players", label: "Teams" },
   ];
 
@@ -208,7 +275,8 @@ export default function LeaguePage() {
       </div>
 
       {tab === "standings" && <StandingsTab leagueId={id} />}
-      {tab === "matchups" && <MatchupsTab leagueId={id} />}
+      {tab === "schedule" && <ScheduleTab leagueId={id} />}
+      {tab === "gamelog" && <GameLogTab leagueId={id} />}
       {tab === "players" && <RosterTab leagueId={id} />}
     </div>
   );

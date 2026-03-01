@@ -1,5 +1,7 @@
 """League management endpoints."""
 
+import asyncio
+import logging
 import uuid
 from datetime import date
 
@@ -11,14 +13,15 @@ from app.database import get_db
 from app.api.deps import get_current_agent
 from app.models.agent import Agent
 from app.models.league import League, LeagueMembership
-from app.models.matchup import Matchup, ScoringPeriod
-from app.models.player import Player
+from app.models.player import Player, PlayerGameLog
 from app.models.team import Team, TeamPlayer
 from app.schemas.leagues import LeagueCreate, LeagueJoin, LeagueResponse, StandingsEntry
 from app.schemas.players import PlayerResponse
 from app.services.auth import generate_invite_code
 from app.services.leaderboard import get_league_standings
 from app.sports.nba import NBARules, NBASchedule
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/leagues", tags=["leagues"])
 _nba_rules = NBARules()
@@ -89,6 +92,8 @@ async def list_public_leagues(db: AsyncSession = Depends(get_db)):
 @router.get("/public/matchups")
 async def public_matchups(db: AsyncSession = Depends(get_db)):
     """Current week matchups across all active/playoff leagues. No auth required."""
+    from app.models.matchup import Matchup, ScoringPeriod
+
     # Find active/playoff leagues
     leagues_result = await db.execute(
         select(League).where(League.status.in_(["active", "playoffs"]))
@@ -161,6 +166,8 @@ async def auto_join_league(
     db: AsyncSession = Depends(get_db),
 ):
     """One-call onboarding: find or create a league and join automatically."""
+    from app.services.draft import initialize_draft
+
     # Get IDs of leagues where agent's owner already has a member (anti-collusion)
     owner_league_ids_q = (
         select(LeagueMembership.league_id)
@@ -228,6 +235,14 @@ async def auto_join_league(
     await db.commit()
     await db.refresh(league)
 
+    # Auto-start draft when league fills
+    if len(league.memberships) >= league.max_teams:
+        try:
+            await initialize_draft(db, league.id)
+            await db.refresh(league)
+        except Exception:
+            logger.exception("Auto-start draft failed for league %s", league.id)
+
     return _league_response(league)
 
 
@@ -247,6 +262,8 @@ async def join_league(
     agent: Agent = Depends(get_current_agent),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.services.draft import initialize_draft
+
     result = await db.execute(select(League).where(League.id == league_id))
     league = result.scalar_one_or_none()
     if not league:
@@ -286,6 +303,14 @@ async def join_league(
     db.add(membership)
     await db.commit()
     await db.refresh(league)
+
+    # Auto-start draft when league fills
+    if len(league.memberships) >= league.max_teams:
+        try:
+            await initialize_draft(db, league.id)
+            await db.refresh(league)
+        except Exception:
+            logger.exception("Auto-start draft failed for league %s", league.id)
 
     return _league_response(league)
 
@@ -405,6 +430,139 @@ async def get_league_teams(
         })
 
     return teams_output
+
+
+@router.get("/{league_id}/game-log")
+async def get_game_log(
+    league_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-team, per-date scoring breakdown from PlayerGameLog."""
+    result = await db.execute(select(League).where(League.id == league_id))
+    league = result.scalar_one_or_none()
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+
+    members_result = await db.execute(
+        select(LeagueMembership).where(LeagueMembership.league_id == league_id)
+    )
+    members = members_result.scalars().all()
+
+    output = []
+    for member in members:
+        agent_name = member.agent.name if member.agent else "Unknown"
+        team = member.team
+        if not team or not team.players:
+            output.append({
+                "agent_name": agent_name,
+                "agent_id": str(member.agent_id),
+                "daily_scores": [],
+            })
+            continue
+
+        starter_player_ids = [tp.player_id for tp in team.players if tp.is_starter]
+        if not starter_player_ids:
+            output.append({
+                "agent_name": agent_name,
+                "agent_id": str(member.agent_id),
+                "daily_scores": [],
+            })
+            continue
+
+        # Get player names
+        players_result = await db.execute(
+            select(Player).where(Player.id.in_(starter_player_ids))
+        )
+        player_map = {p.id: p.full_name for p in players_result.scalars().all()}
+
+        # Get game logs grouped by date
+        logs_result = await db.execute(
+            select(PlayerGameLog).where(
+                PlayerGameLog.player_id.in_(starter_player_ids),
+                PlayerGameLog.season == league.season,
+            ).order_by(PlayerGameLog.game_date.desc())
+        )
+        logs = logs_result.scalars().all()
+
+        # Group by date
+        date_groups: dict[str, list] = {}
+        for log in logs:
+            d = log.game_date.isoformat()
+            if d not in date_groups:
+                date_groups[d] = []
+            date_groups[d].append({
+                "name": player_map.get(log.player_id, "Unknown"),
+                "points": float(log.fantasy_points) if log.fantasy_points else 0,
+            })
+
+        daily_scores = []
+        for d in sorted(date_groups.keys(), reverse=True):
+            players_list = date_groups[d]
+            day_total = sum(p["points"] for p in players_list)
+            daily_scores.append({
+                "date": d,
+                "points": round(day_total, 2),
+                "players": players_list,
+            })
+
+        output.append({
+            "agent_name": agent_name,
+            "agent_id": str(member.agent_id),
+            "daily_scores": daily_scores,
+        })
+
+    return output
+
+
+@router.get("/{league_id}/upcoming-games")
+async def get_upcoming_games(
+    league_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Upcoming NBA games, with annotations for rostered players' teams."""
+    from app.api.nba import fetch_upcoming
+
+    result = await db.execute(select(League).where(League.id == league_id))
+    league = result.scalar_one_or_none()
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+
+    # Get all rostered NBA teams in the league
+    members_result = await db.execute(
+        select(LeagueMembership).where(LeagueMembership.league_id == league_id)
+    )
+    members = members_result.scalars().all()
+
+    rostered_nba_teams = set()
+    for member in members:
+        team = member.team
+        if not team or not team.players:
+            continue
+        for tp in team.players:
+            player_result = await db.execute(
+                select(Player).where(Player.id == tp.player_id)
+            )
+            player = player_result.scalar_one_or_none()
+            if player and player.nba_team:
+                rostered_nba_teams.add(player.nba_team)
+
+    # Fetch upcoming games
+    try:
+        upcoming = await asyncio.to_thread(fetch_upcoming)
+    except Exception:
+        logger.exception("Failed to fetch upcoming games")
+        return {"games": [], "game_date": "", "label": "Error fetching schedule"}
+
+    games = upcoming.get("games", [])
+
+    # Annotate games with whether they involve rostered teams
+    for game in games:
+        game["has_rostered_players"] = (
+            game.get("home_team", "") in rostered_nba_teams
+            or game.get("away_team", "") in rostered_nba_teams
+        )
+
+    return upcoming
 
 
 @router.post("/{league_id}/generate-season")
