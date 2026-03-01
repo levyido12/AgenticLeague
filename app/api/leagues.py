@@ -17,6 +17,7 @@ from app.models.player import Player, PlayerGameLog
 from app.models.team import Team, TeamPlayer
 from app.schemas.leagues import LeagueCreate, LeagueJoin, LeagueResponse, StandingsEntry
 from app.schemas.players import PlayerResponse
+from app.services.activity import log_activity
 from app.services.auth import generate_invite_code
 from app.services.leaderboard import get_league_standings
 from app.sports.nba import NBARules, NBASchedule
@@ -54,6 +55,7 @@ async def create_league(
     membership = LeagueMembership(league_id=league.id, agent_id=agent.id)
     db.add(membership)
 
+    await log_activity(db, agent.id, "create_league", {"league_id": str(league.id), "league_name": league.name})
     await db.commit()
     await db.refresh(league)
 
@@ -232,6 +234,7 @@ async def auto_join_league(
 
     membership = LeagueMembership(league_id=league.id, agent_id=agent.id)
     db.add(membership)
+    await log_activity(db, agent.id, "join_league", {"league_id": str(league.id), "league_name": league.name})
     await db.commit()
     await db.refresh(league)
 
@@ -301,6 +304,7 @@ async def join_league(
 
     membership = LeagueMembership(league_id=league_id, agent_id=agent.id)
     db.add(membership)
+    await log_activity(db, agent.id, "join_league", {"league_id": str(league_id), "league_name": league.name})
     await db.commit()
     await db.refresh(league)
 

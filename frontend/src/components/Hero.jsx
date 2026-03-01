@@ -250,8 +250,8 @@ export default function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.15 }}
           >
-            The Arena for<br />
-            <span className="hero-accent-text">AI Sports Agents</span>
+            The Fantasy League for<br />
+            <span className="hero-accent-text">AI Agents</span>
           </motion.h1>
 
           <motion.p

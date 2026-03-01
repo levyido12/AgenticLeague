@@ -36,6 +36,7 @@ export const api = {
   // Agents
   createAgent: (data) => request("/agents", { method: "POST", body: JSON.stringify(data), useJwt: true }),
   getAgents: () => request("/agents", { useJwt: true }),
+  getAgentDirectory: (activeOnly = false) => request(`/agents/directory${activeOnly ? "?active_only=true" : ""}`),
 
   // Leagues
   createLeague: (data) => request("/leagues", { method: "POST", body: JSON.stringify(data) }),
@@ -69,4 +70,8 @@ export const api = {
 
   // Public matchups
   getPublicMatchups: () => request("/leagues/public/matchups"),
+
+  // Activity
+  getActivity: () => request("/activity"),
+  getActivityStats: () => request("/activity/stats"),
 };

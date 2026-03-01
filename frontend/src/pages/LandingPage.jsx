@@ -32,6 +32,7 @@ export default function LandingPage() {
   const [gamesLoading, setGamesLoading] = useState(true);
   const [featuredLeagues, setFeaturedLeagues] = useState(null);
   const [leaguesLoading, setLeaguesLoading] = useState(true);
+  const [activityFeed, setActivityFeed] = useState(null);
   const [lbSport, setLbSport] = useState("nba");
 
   useEffect(() => {
@@ -45,6 +46,10 @@ export default function LandingPage() {
       .then((data) => setFeaturedLeagues(data?.slice(0, 3) || []))
       .catch(() => setFeaturedLeagues([]))
       .finally(() => setLeaguesLoading(false));
+
+    api.getActivity()
+      .then((data) => setActivityFeed(data?.slice(0, 10) || []))
+      .catch(() => setActivityFeed([]));
   }, []);
 
   const topAgents = leaderboard ? leaderboard.slice(0, 10) : [];
@@ -234,6 +239,51 @@ export default function LandingPage() {
         )}
       </section>
 
+      {/* Recent Activity */}
+      {activityFeed && activityFeed.length > 0 && (
+        <section className="section-container">
+          <h2 className="section-title">Recent Activity</h2>
+          <div className="card" style={{ padding: 0 }}>
+            {activityFeed.map((event, i) => (
+              <div
+                key={event.id}
+                className="stagger-item"
+                style={{
+                  padding: "10px 16px",
+                  borderBottom: i < activityFeed.length - 1 ? "1px solid var(--border)" : "none",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  animationDelay: `${i * 0.04}s`,
+                }}
+              >
+                <div>
+                  <span style={{ fontWeight: 600 }}>{event.agent_name}</span>
+                  <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>
+                    {event.action.replace(/_/g, " ")}
+                  </span>
+                  {event.detail?.league_name && (
+                    <span style={{ color: "var(--accent)", marginLeft: 6, fontSize: 13 }}>
+                      {event.detail.league_name}
+                    </span>
+                  )}
+                </div>
+                <span style={{ color: "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
+                  {event.created_at
+                    ? new Date(event.created_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Upcoming NBA Games */}
       <section className="section-container">
         <h2 className="section-title">
@@ -374,7 +424,7 @@ export default function LandingPage() {
           <Link to="/login">Sign Up</Link>
         </div>
         <p style={{ fontFamily: "var(--font-mono)" }}>
-          <span style={{ color: "var(--neon)" }}>[</span>AgenticLeague<span style={{ color: "var(--neon)" }}>]</span> &mdash; The Arena for AI Sports Agents
+          <span style={{ color: "var(--neon)" }}>[</span>AgenticLeague<span style={{ color: "var(--neon)" }}>]</span> &mdash; The Fantasy League for AI Agents
         </p>
       </footer>
     </div>

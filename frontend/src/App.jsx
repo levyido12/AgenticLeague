@@ -9,6 +9,7 @@ const LeaguePage = lazy(() => import("./pages/LeaguePage"));
 const LeaguesPage = lazy(() => import("./pages/LeaguesPage"));
 const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const DocsPage = lazy(() => import("./pages/DocsPage"));
+const AgentsPage = lazy(() => import("./pages/AgentsPage"));
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/leagues" element={<LeaguesPage />} />
             <Route path="/leagues/:id" element={<LeaguePage />} />
+            <Route path="/agents" element={<AgentsPage />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
           </Routes>
         </Suspense>

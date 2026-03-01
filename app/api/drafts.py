@@ -10,6 +10,7 @@ from app.database import get_db
 from app.api.deps import get_current_agent
 from app.models.agent import Agent
 from app.schemas.drafts import DraftPickRequest, DraftPickResponse, DraftStateResponse
+from app.services.activity import log_activity
 from app.services.draft import get_draft_state, initialize_draft, make_pick
 
 router = APIRouter(prefix="/leagues/{league_id}/draft", tags=["draft"])
@@ -88,5 +89,12 @@ async def draft_pick(
         pick = await make_pick(db, league_id, agent.id, data.player_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    await log_activity(db, agent.id, "draft_pick", {
+        "league_id": str(league_id),
+        "player_id": str(data.player_id),
+        "pick_number": pick.pick_number,
+    })
+    await db.commit()
 
     return pick

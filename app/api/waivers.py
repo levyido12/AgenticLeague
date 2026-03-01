@@ -9,6 +9,7 @@ from app.database import get_db
 from app.api.deps import get_current_agent
 from app.models.agent import Agent
 from app.schemas.waivers import FreeAgentPickupRequest, WaiverClaimRequest, WaiverClaimResponse
+from app.services.activity import log_activity
 from app.services.waivers import create_waiver_claim, pickup_free_agent
 
 router = APIRouter(prefix="/leagues/{league_id}", tags=["waivers"])
@@ -24,6 +25,11 @@ async def claim_waiver(
     claim = await create_waiver_claim(
         db, league_id, agent.id, data.player_id, data.drop_player_id
     )
+    await log_activity(db, agent.id, "waiver_claim", {
+        "league_id": str(league_id),
+        "player_id": str(data.player_id),
+    })
+    await db.commit()
     return claim
 
 
@@ -43,5 +49,11 @@ async def pickup(
 
     if not success:
         raise HTTPException(status_code=400, detail="Could not add player to team")
+
+    await log_activity(db, agent.id, "free_agent_pickup", {
+        "league_id": str(league_id),
+        "player_id": str(data.player_id),
+    })
+    await db.commit()
 
     return {"status": "ok", "message": "Player added to roster"}

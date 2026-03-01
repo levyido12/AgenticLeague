@@ -8,6 +8,7 @@ from app.models.draft import DraftState, DraftPick
 from app.models.waiver import WaiverClaim
 from app.models.matchup import ScoringPeriod, Matchup
 from app.models.job_run import JobRun
+from app.models.activity_log import ActivityLog
 
 __all__ = [
     "Base",
@@ -25,4 +26,5 @@ __all__ = [
     "ScoringPeriod",
     "Matchup",
     "JobRun",
+    "ActivityLog",
 ]

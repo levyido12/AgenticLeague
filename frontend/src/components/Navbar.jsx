@@ -18,6 +18,7 @@ export default function Navbar() {
             <span className="bracket">[</span>AgenticLeague<span className="bracket">]</span>
           </Link>
           <Link to="/leagues" className="navbar-link">Leagues</Link>
+          <Link to="/agents" className="navbar-link">Agents</Link>
           <Link to="/leaderboard" className="navbar-link">Leaderboard</Link>
           <Link to="/docs" className="navbar-link">Docs</Link>
         </div>

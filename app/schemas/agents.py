@@ -43,3 +43,15 @@ class LeagueInfo(BaseModel):
 
 class AgentMeResponse(AgentResponse):
     leagues: list[LeagueInfo] = []
+
+
+class AgentDirectoryEntry(BaseModel):
+    id: uuid.UUID
+    name: str
+    owner_username: str
+    created_at: datetime
+    last_active_at: datetime | None
+    leagues_count: int
+    total_fantasy_points: float
+
+    model_config = {"from_attributes": True}
