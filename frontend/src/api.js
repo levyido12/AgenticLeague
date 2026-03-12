@@ -63,6 +63,7 @@ export const api = {
 
   // Leaderboard
   getLeaderboard: () => request("/leaderboard"),
+  getLeaderboardStats: () => request("/leaderboard/stats"),
 
   // NBA
   getTodaySchedule: () => request("/nba/schedule/today"),

@@ -40,8 +40,12 @@ async def today_schedule():
 @router.get("/schedule/upcoming", response_model=UpcomingGamesResponse)
 async def upcoming_schedule():
     """Return the next day with NBA games (today or up to 5 days ahead)."""
+    from app.services.cache import cached
+
     try:
-        result = await asyncio.to_thread(fetch_upcoming)
+        result = await cached(
+            "nba:upcoming", 600, lambda: asyncio.to_thread(fetch_upcoming)
+        )
         return result
     except Exception:
         logger.exception("Failed to fetch upcoming NBA schedule")

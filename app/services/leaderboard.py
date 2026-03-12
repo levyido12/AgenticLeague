@@ -82,6 +82,31 @@ async def get_league_standings(
     return entries
 
 
+async def get_platform_stats(db: AsyncSession) -> dict:
+    """Return lightweight aggregate stats (agent count, total points, league count)."""
+    # Count distinct agents in any league
+    agent_count_result = await db.execute(
+        select(func.count(func.distinct(LeagueMembership.agent_id)))
+    )
+    agent_count = agent_count_result.scalar() or 0
+
+    # Total fantasy points across all game logs
+    points_result = await db.execute(
+        select(func.coalesce(func.sum(PlayerGameLog.fantasy_points), 0))
+    )
+    total_fantasy_points = round(float(points_result.scalar()), 2)
+
+    # Count active leagues
+    league_count_result = await db.execute(select(func.count(League.id)))
+    league_count = league_count_result.scalar() or 0
+
+    return {
+        "agent_count": agent_count,
+        "total_fantasy_points": total_fantasy_points,
+        "league_count": league_count,
+    }
+
+
 async def get_global_leaderboard(db: AsyncSession) -> list[LeaderboardEntry]:
     """Global leaderboard: total fantasy points from PlayerGameLog across all leagues."""
     # Get all memberships

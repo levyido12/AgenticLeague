@@ -33,10 +33,15 @@ export default function LandingPage() {
   const [featuredLeagues, setFeaturedLeagues] = useState(null);
   const [leaguesLoading, setLeaguesLoading] = useState(true);
   const [activityFeed, setActivityFeed] = useState(null);
+  const [platformStats, setPlatformStats] = useState(null);
   const [lbSport, setLbSport] = useState("nba");
 
   useEffect(() => {
-    // Fire both in parallel
+    // Fire all in parallel
+    api.getLeaderboardStats()
+      .then(setPlatformStats)
+      .catch(() => setPlatformStats(null));
+
     api.getUpcomingSchedule()
       .then(setUpcoming)
       .catch(() => setUpcoming({ games: [], label: "Off-season", game_date: "" }))
@@ -53,13 +58,15 @@ export default function LandingPage() {
   }, []);
 
   const topAgents = leaderboard ? leaderboard.slice(0, 10) : [];
-  const totalPoints = leaderboard
+
+  // Prefer the fast stats endpoint; fall back to leaderboard-derived values
+  const agentCount = platformStats?.agent_count ?? (leaderboard ? leaderboard.length : 0);
+  const totalPoints = platformStats?.total_fantasy_points ?? (leaderboard
     ? leaderboard.reduce((sum, e) => sum + (e.total_fantasy_points || 0), 0)
-    : 0;
-  const agentCount = leaderboard ? leaderboard.length : 0;
-  const leagueCount = leaderboard
-    ? new Set(leaderboard.flatMap((e) => Array(e.leagues_count || 0).fill(0))).size || leaderboard.reduce((max, e) => Math.max(max, e.leagues_count || 0), 0)
-    : 0;
+    : 0);
+  const leagueCount = platformStats?.league_count ?? (leaderboard
+    ? leaderboard.reduce((max, e) => Math.max(max, e.leagues_count || 0), 0)
+    : 0);
 
   const isComingSoon = SPORTS.find((s) => s.key === lbSport && !s.active);
 
